@@ -11,17 +11,33 @@ equivalents are noted where they differ.
 
 ## 1. Install PIRA `master` at `~/agent` with PIRA's own installer
 
-Keel reads PIRA from `~/agent` and never modifies it. Install it exactly once
-with PIRA's setup script; skip Codex configuration (Codex is not needed) and
-audio. Requires Git, Python 3, and network access.
+Keel reads PIRA from `~/agent` and never modifies it. Install or update it
+with PIRA's own setup script; skip Codex configuration (Codex is not needed)
+and audio. Requires Git, Python 3, and network access.
+
+If `~/agent` does not exist:
 
 ```bash
 git clone https://github.com/AlgebraLoveme/PIRA.git ~/agent
+```
+
+If it already exists, it must be a clean `master` checkout; bring it up to
+date without switching branches:
+
+```bash
+cd ~/agent && git status --porcelain && git branch --show-current && git pull --ff-only
+```
+
+Then, in either case:
+
+```bash
 cd ~/agent
 git rev-parse HEAD
 powershell.exe -ExecutionPolicy Bypass -File assets/scripts/setup_pira.ps1 --skip-codex --user-mode placeholder --audio no --legacy remove --yes
 powershell.exe -ExecutionPolicy Bypass -File assets/scripts/setup_pira.ps1 --skip-codex --verify
 ```
+
+The installer also installs `pira_svg_check`; Keel records it as optional.
 
 Open a new shell afterwards so the PATH change takes effect, then confirm:
 
