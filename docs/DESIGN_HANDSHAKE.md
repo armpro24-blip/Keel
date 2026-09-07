@@ -61,6 +61,24 @@ Tool schema: `effect` (`enum: ["read_only","state_changing"]`, required) and
 experiment; the description gains the one sentence used there. JSON Schema
 conditionals are not used; the schema informs, the runtime enforces.
 
+**Definition of `effect`.** `effect` describes *this command as issued*, not
+the task it serves. The two models resolved that ambiguity in opposite
+directions in the experiments: Mistral declared `echo hello` (which changes
+nothing) `state_changing` 4/10 because the task was to create a file; Qwen
+declared `echo -n hello` `read_only` 1/10 for the same reason inverted
+(`docs/evidence/T15_HANDSHAKE_MISTRAL_2026-09-07.md`, `…QWEN36…`). The
+schema description says "this command"; the mechanism tolerates the safe
+direction (a review demanded where none was needed) and, by the ownership
+split, does not correct the other. Across 40 treatment calls no command that
+itself changes state was declared `read_only`. Keel does not infer effect
+from `argv` to settle the ambiguity; that would be the classifier this design
+excludes.
+
+**Batched calls.** When a model emits several calls in one turn (Mistral
+8/10 in T-write: a state-changing write followed by a read-only `type`),
+each call carries its own `effect`; the handshake and the announcement apply
+per call, in the loop's sequential order, before that call executes.
+
 ## Runtime order (deterministic)
 
 ```text
