@@ -6,8 +6,11 @@ acceptance on both models recorded in
 (user decision): a structurally invalid request is denied with the parser's
 message instead of passed through as `Allow`, so `Allow` has one meaning;
 `keel log show` renders the handshake; the loop's per-call decide/execute
-interleaving is pinned by a test. T15 status: CLOSE PENDING FINAL PATCH,
-closing on a probe-5 rerun (`docs/T15_ACCEPTANCE.md`, addendum). The two corrections:
+interleaving is pinned by a test. T15 status: **CLOSED 2026-09-07** after the probe-5
+rerun passed on Qwen3.6 (`docs/evidence/T15_ACCEPTANCE_2026-09-07.md`,
+addendum). Recorded limitation: batched per-call announcement ordering was
+not elicited live from either model; it rests on the deterministic AgentLoop
+test. The two corrections:
 
 1. `safety_review` is mandatory only when the model declares
    `state_changing` **and** the command would otherwise execute without host

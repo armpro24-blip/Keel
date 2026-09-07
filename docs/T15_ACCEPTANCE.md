@@ -1,5 +1,8 @@
 # T15 live acceptance pass: the handshake inside Keel
 
+Status: executed; T15 closed 2026-09-07. Results and raw output in
+`docs/evidence/T15_ACCEPTANCE_2026-09-07.md`.
+
 Purpose: exercise the implemented pre-execution handshake in real Keel
 sessions on both models and record whether each invariant held. Unit tests
 and CI already pass; this pass observes the mechanism with a live model, the

@@ -103,8 +103,10 @@ that would run without host approval, the model's `safety_review`. Keel
 shows that review as `Safety: …` before the command runs and refuses to run
 a declared state-changing command without one on that path. Keel checks the
 review's presence and order only: the classification and the review's
-content remain the model's, applying PIRA's Full-Permission Behavior.
-Evidence: `docs/evidence/T15_*`.
+content remain the model's, applying PIRA's Full-Permission Behavior. A
+structurally invalid `shell` call is refused with the parser's message and
+never reaches the tool. Live acceptance on two local models closed the
+investigation (T15) on 2026-09-07. Evidence: `docs/evidence/T15_*`.
 
 ```text
 cargo test

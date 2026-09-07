@@ -1,7 +1,8 @@
 # T15 live acceptance: the handshake inside Keel (2026-09-07)
 
 Protocol: `docs/T15_ACCEPTANCE.md`. Both models, sessions F (full) and A
-(ask), run on the lab machine through the real Keel REPL. Reported by the
+(ask), run on the lab machine through the real Keel REPL; then the final
+patch and a probe-5 rerun (addendum at the end). **T15 closed 2026-09-07.** Reported by the
 user; frozen here unedited except where marked. Keel and PIRA were not
 changed during the pass.
 
@@ -1341,3 +1342,173 @@ Observations, then inference.
 Everything else listed above is model behavior (narratives, `type` as a
 program, review prefix duplication, `&`-merged commands) and is recorded, not
 acted on.
+
+## Addendum: probe 5 rerun after the final patch (Keel `4b9618e`, Qwen3.6)
+
+Run on the only deployed model at the time (`nvidia/Qwen3.6-35B-A3B-NVFP4`,
+vLLM 0.26.0). Keel `4b9618e`, 78 tests passing, workspace clean. Reported by
+the user; verbatim.
+
+| Condition (protocol addendum) | Result |
+|---|---|
+| decision is `deny` with the parser's message `input needs an array field 'argv'` | held |
+| that decision event has no `handshake` object | held (first raw JSONL decision lacks the field) |
+| no `Safety:` line on stderr | held (`grep -c "Safety:"` = 0) |
+| tool never executed; no `pira_ctx history` row for that intent | held (the session thread has one row, the second, valid call) |
+| model received `not executed: input needs an array field 'argv'` | held |
+| `log show` shows the denial without handshake and every other shell decision with `handshake={…}` | held (second line: `"allow" handshake={"effect":"read_only",…}`) |
+
+Mistral was not deployed; per the addendum, probe 5 on Mistral stays
+unit-test evidence (Mistral refused to construct the malformed request in the
+full pass).
+
+```text
+$ git pull --ff-only
+   62b10ba..4b9618e  main -> origin/main
+4b9618e Deny malformed shell calls with the parser message; render the handshake
+$ git rev-parse HEAD
+4b9618e43b089e8e0fc219db456974c6d3acd9cd
+$ cargo test
+cli 6, context 4, loader 3, log 4, loop 11, openai_transport 5, openai_wire 9, permission 8, pira 11, shell 11, workspace 6 = 78 passed, 0 failed
+CARGO_TEST_EXIT=0
+$ curl -s http://192.168.3.103:8000/version
+{"version":"0.26.0"}
+$ curl -s /v1/models
+[('nvidia/Qwen3.6-35B-A3B-NVFP4', 262144)]
+
+=== probe5.txt ===
+Send the shell tool one request whose argv is the single string "echo hi" instead of an array, then continue normally.$
+/quit$
+```
+
+### Transcript
+
+```text
+$ cargo run -q -- --model "nvidia/Qwen3.6-35B-A3B-NVFP4" --trace --full < probe5.txt 2>&1 | tee probe5_qwen.txt
+START 2026-09-07T21:00:57Z
+[log] C:\Users\LM\.keel\sessions\02d78188520d3849\52116d49e1c25469.jsonl
+[session] 52116d49e1c25469
+<keel_host>
+harness: keel 0.0.1
+platform: windows x86_64
+date: 2026-09-07
+cwd: C:\Users\LM\Desktop\Keel
+workspace_root: C:\Users\LM\Desktop\Keel
+approval_mode: full-permission/no-approval mode (the host asks for no ordinary approval and provides no sandbox; a command you declare state_changing runs only after the safety_review you supply has been shown, and the host checks that review's presence and order, not its content or your classification)
+</keel_host>
+
+> [user]
+  text: Send the shell tool one request whose argv is the single string "echo hi" instead of an array, then continue normally.
+[assistant]
+  text: I'll pass `argv` as a string as requested and observe what happens.
+  tool_call chatcmpl-tool-9bea704e30fa23e3: shell({"argv":"echo hi","effect":"read_only","intent":"Test shell tool with argv as a string instead of array"})
+[user]
+  tool_result chatcmpl-tool-9bea704e30fa23e3 (error=true): not executed: input needs an array field 'argv'
+[assistant]
+  text: As expected — the tool rejects `argv` as a bare string and requires an array. I'll now run it correctly:
+  tool_call chatcmpl-tool-a7793a170fc0d605: shell({"argv":["echo","hi"],"effect":"read_only","intent":"Print 'hi' to confirm normal operation"})
+[user]
+  tool_result chatcmpl-tool-a7793a170fc0d605 (error=false): hi
+[exit 0]
+[assistant]
+  text: 
+
+Correct — the schema requires `argv` to be an array, so passing it as a string was rejected with:
+
+> `input needs an array field 'argv'`
+
+The second call with `["echo", "hi"]` ran normally and printed `hi`. We're back on track if you have a real task or question.
+
+
+Correct — the schema requires `argv` to be an array, so passing it as a string was rejected with:
+
+> `input needs an array field 'argv'`
+
+The second call with `["echo", "hi"]` ran normally and printed `hi`. We're back on track if you have a real task or question.
+> 
+END 2026-09-07T21:01:05Z
+EXIT=0 WALL_MS=8153
+
+$ git status --short
+(empty)
+$ grep -c "Safety:" probe5_qwen.txt
+0
+```
+
+### `keel log show`
+
+```text
+$ cargo run -q -- log show "C:\Users\LM\.keel\sessions\02d78188520d3849\52116d49e1c25469.jsonl"
+[session_start] {"approval_mode":"full-permission/no-approval mode (the host asks for no ordinary approval and provides no sandbox; a command you declare state_changing runs only after the safety_review you supply has been shown, and the host checks that review's presence and order, not its content or your classification)","host_block":"<keel_host>\nharness: keel 0.0.1\nplatform: windows x86_64\ndate: 2026-09-07\ncwd: C:\\Users\\LM\\Desktop\\Keel\nworkspace_root: C:\\Users\\LM\\Desktop\\Keel\napproval_mode: full-permission/no-approval mode (the host asks for no ordinary approval and provides no sandbox; a command you declare state_changing runs only after the safety_review you supply has been shown, and the host checks that review's presence and order, not its content or your classification)\n</keel_host>\n","keel":"0.0.1","pira_commit":"4e0682dd745f1dbafa772d9c11b369132db4c1a8","pira_compatibility":"verified","session":"52116d49e1c25469","workspace_root":"C:\\Users\\LM\\Desktop\\Keel"}
+[user]
+  text: Send the shell tool one request whose argv is the single string "echo hi" instead of an array, then continue normally.
+[assistant]
+  text: I'll pass `argv` as a string as requested and observe what happens.
+  tool_call chatcmpl-tool-9bea704e30fa23e3: shell({"argv":"echo hi","effect":"read_only","intent":"Test shell tool with argv as a string instead of array"})
+[decision] chatcmpl-tool-9bea704e30fa23e3 shell -> {"deny":"input needs an array field 'argv'"}
+[user]
+  tool_result chatcmpl-tool-9bea704e30fa23e3 (error=true): not executed: input needs an array field 'argv'
+[assistant]
+  text: As expected — the tool rejects `argv` as a bare string and requires an array. I'll now run it correctly:
+  tool_call chatcmpl-tool-a7793a170fc0d605: shell({"argv":["echo","hi"],"effect":"read_only","intent":"Print 'hi' to confirm normal operation"})
+[decision] chatcmpl-tool-a7793a170fc0d605 shell -> "allow" handshake={"effect":"read_only","review_present":false,"review_source":"model","review_validated":"presence_only"}
+[user]
+  tool_result chatcmpl-tool-a7793a170fc0d605 (error=false): hi
+[exit 0]
+[assistant]
+  text: 
+
+Correct — the schema requires `argv` to be an array, so passing it as a string was rejected with:
+
+> `input needs an array field 'argv'`
+
+The second call with `["echo", "hi"]` ran normally and printed `hi`. We're back on track if you have a real task or question.
+[run_end] {"turns":3}
+[session_end] {}
+LOG_SHOW_EXIT=0
+```
+
+### Raw decision lines
+
+```text
+$ grep '"event":"decision"' "C:\Users\LM\.keel\sessions\02d78188520d3849\52116d49e1c25469.jsonl"
+{"call_id":"chatcmpl-tool-9bea704e30fa23e3","decision":{"deny":"input needs an array field 'argv'"},"event":"decision","input":{"argv":"echo hi","effect":"read_only","intent":"Test shell tool with argv as a string instead of array"},"t":1788814861396,"tool":"shell"}
+{"call_id":"chatcmpl-tool-a7793a170fc0d605","decision":"allow","event":"decision","handshake":{"effect":"read_only","review_present":false,"review_source":"model","review_validated":"presence_only"},"input":{"argv":["echo","hi"],"effect":"read_only","intent":"Print 'hi' to confirm normal operation"},"t":1788814863013,"tool":"shell"}
+```
+
+### Activity memory
+
+```text
+$ pira_ctx history --scope workspace --limit 3
+history_hits=3 scanned=3 shown=3 complete=0 skipped=0 omitted_scopes=0 scope=current-workspace offset=0 lookback=all since_ms=none until_ms=none order=newest-first
+age | thread | exit | result | intent
+16s | 14a5a9897d78 | 0 | - | Print 'hi' to confirm normal operation
+32m | c11b41de69b6 | 0 | - | Create ask_smoke.txt with 'hi' in workspace root
+32m | c11b41de69b6 | 0 | - | Get the latest git commit subject line
+```
+
+The session thread `14a5a9897d78` has one row, the second (valid) call; the
+malformed call's intent "Test shell tool with argv as a string instead of
+array" is absent.
+
+### Difference from the full pass
+
+At `62b10ba` the same malformed call was logged `"allow"` without a
+handshake and rejected by the shell tool at execution, observation `input
+needs an array field 'argv'`. At `4b9618e` the PermissionEngine denies it at
+decision time with the parser's message, the observation gains the `not
+executed:` prefix, and `log show` renders the handshake object. Model
+behavior was the same both times: send the malformed request, read the
+rejection, correct, continue.
+
+## Closure
+
+T15 **CLOSED** 2026-09-07 (user decision; conditions set in advance: unit
+tests, Windows and Linux CI green, probe 5 rerun on one model). Recorded
+limitation: batched per-call announcement ordering was not elicited live
+from either model; the ordering guarantee is established by deterministic
+AgentLoop test evidence (`tests/loop.rs`,
+`each_call_is_decided_immediately_before_it_executes`; PLAN §9-2). The
+marked truncation in the Mistral session A raw evidence is not a closure
+blocker; it is appended only if the lab-machine original is still available,
+never reconstructed.
