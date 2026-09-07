@@ -28,6 +28,18 @@ const MAX_TURNS: usize = 8;
 /// full-permission rules.
 const APPROVAL_MODE: &str = "full (Keel asks for no approvals and provides no sandbox)";
 
+/// Write one line to stdout. A closed pipe (`keel pira check | head -1`) is
+/// the reader's choice, not a fault: stop quietly instead of panicking.
+fn say(line: impl std::fmt::Display) {
+    let mut stdout = io::stdout().lock();
+    if let Err(error) = writeln!(stdout, "{line}") {
+        if error.kind() == io::ErrorKind::BrokenPipe {
+            std::process::exit(0);
+        }
+        panic!("cannot write to stdout: {error}");
+    }
+}
+
 fn usage_error(message: &str) -> ! {
     eprintln!("error: {message}");
     eprintln!("{USAGE}");
@@ -72,9 +84,9 @@ fn describe(message: &Message) -> String {
 
 /// Print the INCOMPATIBLE state with its reasons and return the exit code.
 fn incompatible(reasons: &[String]) -> i32 {
-    println!("state: INCOMPATIBLE");
+    say("state: INCOMPATIBLE");
     for reason in reasons {
-        println!("  {reason}");
+        say(format!("  {reason}"));
     }
     eprintln!("error: Keel cannot rely on this PIRA installation; fix the reasons above (this state is never locked)");
     1
@@ -95,36 +107,42 @@ fn pira_check(record_lock: bool) -> i32 {
         Ok(found) => found,
         Err(reason) => return incompatible(&[reason]),
     };
-    println!("PIRA installation: {}", install.root().display());
-    println!("verification token: present");
-    println!("policy sources: {}", inspection.policy.sources.len());
+    say(format!("PIRA installation: {}", install.root().display()));
+    say("verification token: present");
+    say(format!(
+        "policy sources: {}",
+        inspection.policy.sources.len()
+    ));
     for source in &inspection.policy.sources {
-        println!("  {} -> {}", source.name, source.relative_path);
+        say(format!("  {} -> {}", source.name, source.relative_path));
     }
     for (tool, version) in &inspection.fingerprint.tools {
-        println!("tool {tool}: {}", version.as_deref().unwrap_or("not found"));
+        say(format!(
+            "tool {tool}: {}",
+            version.as_deref().unwrap_or("not found")
+        ));
     }
-    println!(
+    say(format!(
         "source commit: {}",
         inspection
             .fingerprint
             .source_commit
             .as_deref()
             .unwrap_or("unknown (not a git checkout or git unavailable)")
-    );
+    ));
 
     match &inspection.compatibility {
         Compatibility::Verified => {
-            println!("state: VERIFIED (matches {})", lock_path.display());
+            say(format!("state: VERIFIED (matches {})", lock_path.display()));
             if record_lock {
-                println!("lock unchanged");
+                say("lock unchanged");
             }
             0
         }
         Compatibility::UnverifiedCompatible { drift } => {
-            println!("state: UNVERIFIED-COMPATIBLE");
+            say("state: UNVERIFIED-COMPATIBLE");
             for item in drift {
-                println!("  drift: {item}");
+                say(format!("  drift: {item}"));
             }
             if record_lock {
                 record(&inspection.fingerprint, &lock_path)
@@ -140,7 +158,7 @@ fn pira_check(record_lock: bool) -> i32 {
 fn record(fingerprint: &Fingerprint, lock_path: &Path) -> i32 {
     match Lock::from_fingerprint(fingerprint, unix_now()).write(lock_path) {
         Ok(()) => {
-            println!("recorded: {}", lock_path.display());
+            say(format!("recorded: {}", lock_path.display()));
             0
         }
         Err(error) => {
@@ -153,6 +171,11 @@ fn record(fingerprint: &Fingerprint, lock_path: &Path) -> i32 {
 /// The REPL. PIRA must be readable and compatible before the model is asked
 /// anything; drift is a warning, INCOMPATIBLE refuses to start (PLAN.md §4.2).
 fn repl(model_name: String, trace: bool) {
+    // Cheap configuration mistakes first, then the PIRA gate.
+    let mut model = match OpenAiChatModel::from_env(model_name) {
+        Ok(model) => model,
+        Err(message) => usage_error(&message),
+    };
     let (install, inspection, _) = match inspect_default() {
         Ok(found) => found,
         Err(reason) => {
@@ -177,11 +200,6 @@ fn repl(model_name: String, trace: bool) {
             std::process::exit(1);
         }
     }
-
-    let mut model = match OpenAiChatModel::from_env(model_name) {
-        Ok(model) => model,
-        Err(message) => usage_error(&message),
-    };
 
     let cwd = std::env::current_dir().unwrap_or_else(|error| {
         eprintln!("error: cannot determine the working directory: {error}");
@@ -251,7 +269,7 @@ fn repl(model_name: String, trace: bool) {
             }
         }
         match outcome {
-            Ok(outcome) => println!("{}", outcome.final_text),
+            Ok(outcome) => say(&outcome.final_text),
             Err(error) => eprintln!("error: {error}"),
         }
     }
@@ -262,8 +280,8 @@ fn main() {
     match parse_args(&args, std::env::var("OPENAI_MODEL").ok()) {
         Ok(Cli::Run { model, trace }) => repl(model, trace),
         Ok(Cli::PiraCheck { lock }) => std::process::exit(pira_check(lock)),
-        Ok(Cli::Help) => println!("{USAGE}"),
-        Ok(Cli::Version) => println!("keel {}", env!("CARGO_PKG_VERSION")),
+        Ok(Cli::Help) => say(USAGE),
+        Ok(Cli::Version) => say(format!("keel {}", env!("CARGO_PKG_VERSION"))),
         Err(message) => usage_error(&message),
     }
 }

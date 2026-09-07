@@ -10,7 +10,7 @@
 use serde_json::{json, Value};
 
 use crate::message::ToolSpec;
-use crate::pira::{PiraInstall, Policy, POLICY_PATH_PREFIX};
+use crate::pira::{PiraInstall, Policy};
 use crate::tool::{Tool, ToolResult};
 
 pub const TOOL_NAME: &str = "read_pira_policy";
@@ -55,16 +55,13 @@ impl Tool for PolicyLoader {
         let Some(name) = input.get("name").and_then(Value::as_str) else {
             return ToolResult::error("input needs a string field 'name'");
         };
-        let Some(source) = self.policy.sources.iter().find(|s| s.name == name) else {
+        let Some(source) = self.policy.source(name) else {
             return ToolResult::error(format!(
                 "'{name}' is not a policy source declared by AGENTS.md"
             ));
         };
-        match self.install.read_source(&self.policy, name) {
-            Ok(text) => ToolResult::policy(
-                text,
-                format!("{POLICY_PATH_PREFIX}{}", source.relative_path),
-            ),
+        match self.install.read(source) {
+            Ok(text) => ToolResult::policy(text, Policy::display_path(source)),
             Err(error) => ToolResult::error(error.to_string()),
         }
     }

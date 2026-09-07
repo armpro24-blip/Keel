@@ -1,5 +1,9 @@
 # M1 smoke test against a real model
 
+> Historical protocol, closed on 2026-09-07 (see `docs/evidence/`). Since M2 B
+> the REPL also requires a compatible PIRA installation at `~/agent`; the M2
+> smoke protocol supersedes this one.
+
 Purpose: close the M1 gate in `PLAN.md` §7 by observing a real model's
 tool-use behavior through Keel. This is an opt-in manual run, not part of
 `cargo test`. It needs a machine that can reach the model server.

@@ -100,22 +100,22 @@ impl PiraInstall {
         Ok(Policy { agents_md, sources })
     }
 
-    /// Exact bytes of one declared policy source. Only names the routing
-    /// table declares are loadable; this is the loader's trust boundary
-    /// (PLAN.md §5.5).
-    pub fn read_source(&self, policy: &Policy, name: &str) -> Result<String, PiraError> {
-        let source = policy
-            .sources
-            .iter()
-            .find(|source| source.name == name)
-            .ok_or_else(|| {
-                PiraError(format!(
-                    "'{name}' is not a policy source declared by AGENTS.md"
-                ))
-            })?;
+    /// Exact bytes of one declared policy source.
+    pub fn read(&self, source: &PolicySource) -> Result<String, PiraError> {
         let path = self.root.join(&source.relative_path);
         fs::read_to_string(&path)
             .map_err(|error| PiraError(format!("cannot read {}: {error}", path.display())))
+    }
+
+    /// `read` by name. Only names the routing table declares are loadable;
+    /// this is the loader's trust boundary (PLAN.md §5.5).
+    pub fn read_source(&self, policy: &Policy, name: &str) -> Result<String, PiraError> {
+        let source = policy.source(name).ok_or_else(|| {
+            PiraError(format!(
+                "'{name}' is not a policy source declared by AGENTS.md"
+            ))
+        })?;
+        self.read(source)
     }
 
     /// File-level contract: every declared source exists and is readable.
@@ -179,6 +179,18 @@ pub struct PolicySource {
 pub struct Policy {
     pub agents_md: String,
     pub sources: Vec<PolicySource>,
+}
+
+impl Policy {
+    /// The declared source with this routing-table name, if any.
+    pub fn source(&self, name: &str) -> Option<&PolicySource> {
+        self.sources.iter().find(|source| source.name == name)
+    }
+
+    /// The path as PIRA's text names it, e.g. `~/agent/modules/CODING_STYLE.md`.
+    pub fn display_path(source: &PolicySource) -> String {
+        format!("{POLICY_PATH_PREFIX}{}", source.relative_path)
+    }
 }
 
 /// Parse lines of the form `` - `name`: `~/agent/relative/path` … `` inside
