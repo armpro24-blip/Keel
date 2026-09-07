@@ -102,7 +102,7 @@ req = urllib.request.Request("http://192.168.3.103:8000/tokenize", data=json.dum
                              headers={"Content-Type": "application/json", "Authorization": "Bearer dummy"})
 result = json.load(urllib.request.urlopen(req))
 open("t15_step2_tokenize.json", "wb").write(json.dumps(result).encode("utf-8"))
-rendered = "".join(result.get("token_strs", []))
+rendered = "".join(result.get("token_strs", []))  # valid for Mistral; for byte-level BPE tokenizers use /detokenize or /v1/chat/completions/render instead
 # Write bytes: text mode on Windows would turn \r\n into \r\r\n.
 open("t15_step2_rendered_prompt.txt", "wb").write(rendered.encode("utf-8"))
 print("token count:", result.get("count"))

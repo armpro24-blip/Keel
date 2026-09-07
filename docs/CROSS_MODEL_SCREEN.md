@@ -11,7 +11,8 @@ Response Style section, and the serving configuration once recorded. The
 rejected policy pointer is not included. Sampling parameters are not set by
 Keel or by the scripts; the server defaults apply and are recorded.
 
-First candidate: `nvidia/Qwen3.6-35B-A3B-NVFP4` on the lab vLLM server.
+First candidate: `nvidia/Qwen3.6-35B-A3B-NVFP4` on the lab vLLM server
+(executed 2026-09-07: `docs/evidence/SCREEN_QWEN36_2026-09-07.md`).
 
 ## 0. Record the configuration before any run
 
@@ -82,9 +83,13 @@ keel_smoke.txt` and `git status --short` afterwards and remove the file if
 present. Keep the wire file local.
 
 Optionally, to see what the serving stack appends for this model (Mistral's
-template appended `[MODEL_SETTINGS]{"reasoning_effort": "none"}`), send
-`screen_B_request.json` to `/tokenize` as in `docs/AUDIT_T15.md` step 2 and
-report the last 300 characters of the rendered prompt and the token count.
+template appended `[MODEL_SETTINGS]{"reasoning_effort": "none"}`), obtain the
+rendered prompt. Prefer `POST /v1/chat/completions/render` with the request
+body when the server exposes it (check `openapi.json`); otherwise send the
+body to `/tokenize` and reconstruct the text with `/detokenize` from the
+returned token ids. Do not join `token_strs`: for byte-level BPE tokenizers
+(Qwen) they are a notation, not text. Report the last 300 characters of the
+rendered prompt and the token count.
 
 ## Scoring (same rule as the Mistral evidence)
 
