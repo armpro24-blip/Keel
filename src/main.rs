@@ -1,5 +1,6 @@
 //! The `keel` binary: a stdin/stdout REPL that runs PIRA over one real model,
-//! plus `keel pira check` to validate the installed PIRA (PLAN.md §7, M1–M2).
+//! `keel pira check` to validate the installed PIRA, and `keel log show` to
+//! inspect a recorded session (PLAN.md §7, M1–M3).
 //!
 //! Output convention: findings and the final `state:` line go to stdout;
 //! warnings, errors, trace, and approval prompts go to stderr.
@@ -13,7 +14,7 @@ use keel::cli::{parse_args, Cli, USAGE};
 use keel::context::{ContextManager, HostInfo};
 use keel::loader::{self, PolicyLoader};
 use keel::log::{
-    default_sessions_dir, message_to_json, read_events, render_event, LoggedGate, SessionLog,
+    default_sessions_dir, message_to_json, read_events, render_event, Recorder, SessionLog,
 };
 use keel::message::Message;
 use keel::openai::OpenAiChatModel;
@@ -187,7 +188,7 @@ fn log_show(path: &str) -> i32 {
 
 /// The REPL. PIRA must be readable and compatible before the model is asked
 /// anything; drift is a warning, INCOMPATIBLE refuses to start (PLAN.md §4.2).
-fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
+fn repl(model_name: String, trace: bool, mode: ApprovalMode, record_wire: bool) {
     // Cheap configuration mistakes first, then the PIRA gate.
     let mut model = match OpenAiChatModel::from_env(model_name) {
         Ok(model) => model,
@@ -272,10 +273,19 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
         "workspace_root": workspace.root().display().to_string(),
         "approval_mode": mode.describe(),
         "pira_commit": inspection.fingerprint.source_commit,
-        "pira_compatibility": format!("{:?}", inspection.compatibility),
+        "pira_compatibility": inspection.compatibility.to_json(),
         "host_block": context.host_block(),
     }));
     eprintln!("[log] {}", log.path().display());
+    if record_wire {
+        let wire = SessionLog::open(&sessions_dir, &format!("{}.wire", session.as_str()))
+            .unwrap_or_else(|error| {
+                eprintln!("error: {error}");
+                std::process::exit(1);
+            });
+        eprintln!("[wire] {}", wire.path().display());
+        model.record_wire_to(wire);
+    }
     let agent = AgentLoop {
         system: context.system_instruction(),
         max_turns: MAX_TURNS,
@@ -302,21 +312,22 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
 
         let before = transcript.len();
         let outcome = {
-            let mut logged_gate = LoggedGate::new(&mut gate, &mut log);
+            let mut recorder = Recorder::new(&mut gate, &mut log);
             agent.run(
                 &mut model,
                 &mut tools,
-                &mut logged_gate,
+                &mut recorder,
                 &mut transcript,
                 input,
             )
         };
-        for message in &transcript[before..] {
-            let event = message_to_json(message);
-            if trace {
-                eprintln!("{}", render_event(&event));
+        if trace {
+            for message in &transcript[before..] {
+                eprintln!("{}", render_event(&message_to_json(message)));
             }
-            log.record(event);
+        }
+        if let Some(failure) = model.take_wire_log_failure() {
+            eprintln!("warning: wire log: {failure}");
         }
         match &outcome {
             Ok(outcome) => log.record(serde_json::json!({
@@ -345,13 +356,18 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_args(&args, std::env::var("OPENAI_MODEL").ok()) {
-        Ok(Cli::Run { model, trace, full }) => {
+        Ok(Cli::Run {
+            model,
+            trace,
+            full,
+            record_wire,
+        }) => {
             let mode = if full {
                 ApprovalMode::Full
             } else {
                 ApprovalMode::Ask
             };
-            repl(model, trace, mode)
+            repl(model, trace, mode, record_wire)
         }
         Ok(Cli::PiraCheck { lock }) => std::process::exit(pira_check(lock)),
         Ok(Cli::LogShow { path }) => std::process::exit(log_show(&path)),

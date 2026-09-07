@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use common::TempDir;
-use keel::agent::{Decision, ToolGate};
+use keel::agent::{Decision, Hooks};
 use keel::message::ToolCall;
 use keel::permission::{ApprovalMode, Approver, PermissionEngine};
 use keel::workspace::Workspace;

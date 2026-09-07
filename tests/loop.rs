@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use keel::agent::{AgentLoop, AllowAll, Decision, LoopError, ToolGate};
+use keel::agent::{AgentLoop, AllowAll, Decision, Hooks, LoopError};
 use keel::message::{Block, Message, Provenance, Role, ToolCall, ToolSpec};
 use keel::model::{FakeModel, ModelError};
 use keel::tool::{DuplicateToolName, EchoTool, Tool, ToolRegistry, ToolResult};
@@ -252,7 +252,7 @@ struct DenyAll {
     asked: Vec<String>,
 }
 
-impl ToolGate for DenyAll {
+impl Hooks for DenyAll {
     fn decide(&mut self, call: &ToolCall) -> Decision {
         self.asked.push(call.name.clone());
         Decision::Deny("test policy".to_string())
@@ -312,4 +312,47 @@ fn a_denied_call_is_not_executed_and_becomes_an_error_observation() {
         }
         other => panic!("expected ToolResult, got {other:?}"),
     }
+}
+
+/// Records the role of every message the loop reports, in order.
+struct Order {
+    roles: Vec<Role>,
+    decisions: usize,
+}
+
+impl Hooks for Order {
+    fn decide(&mut self, _call: &ToolCall) -> Decision {
+        self.decisions += 1;
+        Decision::Allow
+    }
+
+    fn on_message(&mut self, message: &Message) {
+        self.roles.push(message.role);
+    }
+}
+
+#[test]
+fn hooks_see_every_message_in_the_order_it_joins_the_transcript() {
+    let mut model = FakeModel::new(vec![
+        assistant_calls(vec![tool_call("c", "echo", json!({}))]),
+        Message::assistant_text("done"),
+    ]);
+    let mut tools = echo_registry();
+    let mut order = Order {
+        roles: Vec::new(),
+        decisions: 0,
+    };
+    let mut transcript = Vec::new();
+
+    agent(3)
+        .run(&mut model, &mut tools, &mut order, &mut transcript, "go")
+        .unwrap();
+
+    // user input, assistant call, tool results, assistant answer
+    assert_eq!(
+        order.roles,
+        vec![Role::User, Role::Assistant, Role::User, Role::Assistant]
+    );
+    assert_eq!(order.decisions, 1);
+    assert_eq!(order.roles.len(), transcript.len());
 }

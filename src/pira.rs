@@ -422,6 +422,19 @@ pub enum Compatibility {
     Incompatible { failures: Vec<String> },
 }
 
+impl Compatibility {
+    /// The state as a JSON value, for the session log.
+    pub fn to_json(&self) -> Value {
+        match self {
+            Compatibility::Verified => json!("verified"),
+            Compatibility::UnverifiedCompatible { drift } => {
+                json!({ "unverified_compatible": drift })
+            }
+            Compatibility::Incompatible { failures } => json!({ "incompatible": failures }),
+        }
+    }
+}
+
 /// Decide the state. Contract failures dominate; otherwise any difference
 /// from the lock is drift.
 pub fn compare(

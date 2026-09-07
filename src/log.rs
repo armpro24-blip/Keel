@@ -14,7 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
-use crate::agent::{Decision, ToolGate};
+use crate::agent::{Decision, Hooks};
 use crate::message::{Block, Message, Provenance, Role, ToolCall};
 use crate::pira::{home_dir, sha256_hex, PiraError};
 
@@ -217,20 +217,21 @@ fn render_block(block: &Value) -> String {
     }
 }
 
-/// A gate that records every decision before returning it, so the log shows
-/// what was asked and what was decided even when nothing executed.
-pub struct LoggedGate<'a> {
-    inner: &'a mut dyn ToolGate,
+/// Hooks that record the run as it happens: every message the moment it
+/// joins the transcript, every decision before it is returned. The log
+/// therefore reads in the order things occurred, without reconstruction.
+pub struct Recorder<'a> {
+    inner: &'a mut dyn Hooks,
     log: &'a mut SessionLog,
 }
 
-impl<'a> LoggedGate<'a> {
-    pub fn new(inner: &'a mut dyn ToolGate, log: &'a mut SessionLog) -> LoggedGate<'a> {
-        LoggedGate { inner, log }
+impl<'a> Recorder<'a> {
+    pub fn new(inner: &'a mut dyn Hooks, log: &'a mut SessionLog) -> Recorder<'a> {
+        Recorder { inner, log }
     }
 }
 
-impl ToolGate for LoggedGate<'_> {
+impl Hooks for Recorder<'_> {
     fn decide(&mut self, call: &ToolCall) -> Decision {
         let decision = self.inner.decide(call);
         let verdict = match &decision {
@@ -245,5 +246,10 @@ impl ToolGate for LoggedGate<'_> {
             "decision": verdict,
         }));
         decision
+    }
+
+    fn on_message(&mut self, message: &Message) {
+        self.inner.on_message(message);
+        self.log.record(message_to_json(message));
     }
 }

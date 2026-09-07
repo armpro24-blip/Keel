@@ -10,7 +10,7 @@
 //! The engine does not judge destructive risk; that semantic review stays
 //! with PIRA (`Safety:` in full mode). It only asks the user or does not.
 
-use crate::agent::{Decision, ToolGate};
+use crate::agent::{Decision, Hooks};
 use crate::message::ToolCall;
 use crate::shell::{self, ShellRequest};
 use crate::workspace::{PathScope, Workspace};
@@ -32,7 +32,7 @@ impl ApprovalMode {
                 "ask (the user confirms each action before it runs; loading PIRA policy needs no confirmation)"
             }
             ApprovalMode::Full => {
-                "full (no ordinary host approval and no sandbox; semantic safety relies on the model following PIRA's full-permission rules, which Keel does not enforce)"
+                "full-permission/no-approval mode (the host asks for no ordinary approval and provides no sandbox; PIRA's Full-Permission Behavior applies and the host does not enforce it)"
             }
         }
     }
@@ -80,7 +80,7 @@ impl PermissionEngine {
     }
 }
 
-impl ToolGate for PermissionEngine {
+impl Hooks for PermissionEngine {
     fn decide(&mut self, call: &ToolCall) -> Decision {
         if self.read_only.contains(&call.name) {
             return Decision::Allow;

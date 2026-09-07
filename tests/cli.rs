@@ -11,6 +11,7 @@ fn run(model: &str, trace: bool, full: bool) -> Cli {
         model: model.to_string(),
         trace,
         full,
+        record_wire: false,
     }
 }
 
@@ -23,6 +24,15 @@ fn model_flag_trace_and_full() {
     assert_eq!(
         parse_args(&args(&["--full", "--model", "m"]), None),
         Ok(run("m", false, true))
+    );
+    assert_eq!(
+        parse_args(&args(&["--model", "m", "--record-wire"]), None),
+        Ok(Cli::Run {
+            model: "m".to_string(),
+            trace: false,
+            full: false,
+            record_wire: true,
+        })
     );
 }
 

@@ -5,6 +5,10 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::thread::{self, JoinHandle};
 
+mod common;
+
+use common::TempDir;
+use keel::log::{read_events, SessionLog};
 use keel::message::Message;
 use keel::model::{Model, ModelError};
 use keel::openai::OpenAiChatModel;
@@ -178,4 +182,34 @@ fn unreachable_server_is_a_provider_error() {
         }
         other => panic!("expected Provider error, got {other:?}"),
     }
+}
+
+#[test]
+fn the_wire_log_records_the_exact_request_and_response_bodies() {
+    let dir = TempDir::new("wire");
+    let (base_url, server) = serve_once(
+        "HTTP/1.1 200 OK",
+        r#"{"choices":[{"message":{"role":"assistant","content":"pong"}}]}"#,
+    );
+    let mut model = OpenAiChatModel::new("k".to_string(), base_url, "m".to_string());
+    let wire = SessionLog::open(&dir.path, "s.wire").unwrap();
+    let wire_path = wire.path().to_path_buf();
+    model.record_wire_to(wire);
+
+    model
+        .complete("sys", &[Message::user_text("ping")], &[])
+        .unwrap();
+    server.join().expect("server thread");
+
+    let events = read_events(&wire_path).unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0]["event"], "request");
+    assert_eq!(events[0]["body"]["messages"][0]["content"], "sys");
+    assert_eq!(events[0]["body"]["messages"][1]["content"], "ping");
+    assert_eq!(events[1]["event"], "response");
+    assert_eq!(
+        events[1]["body"]["choices"][0]["message"]["content"],
+        "pong"
+    );
+    assert!(model.take_wire_log_failure().is_none());
 }

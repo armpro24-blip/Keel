@@ -3,8 +3,8 @@
 mod common;
 
 use common::TempDir;
-use keel::agent::{AllowAll, Decision, ToolGate};
-use keel::log::{message_to_json, read_events, render_event, LoggedGate, SessionLog};
+use keel::agent::{AllowAll, Decision, Hooks};
+use keel::log::{message_to_json, read_events, render_event, Recorder, SessionLog};
 use keel::message::{Block, Message, Provenance, Role, ToolCall};
 use serde_json::json;
 
@@ -92,14 +92,14 @@ fn messages_serialize_every_block_kind_and_provenance() {
 /// Denies everything, to show the log records denials without execution.
 struct DenyAll;
 
-impl ToolGate for DenyAll {
+impl Hooks for DenyAll {
     fn decide(&mut self, _call: &ToolCall) -> Decision {
         Decision::Deny("test".to_string())
     }
 }
 
 #[test]
-fn logged_gate_records_allow_and_deny_and_passes_the_decision_through() {
+fn recorder_logs_messages_and_decisions_in_order_and_passes_decisions_through() {
     let dir = TempDir::new("log-gate");
     let mut log = SessionLog::open(&dir.path, "gate").unwrap();
     let call = ToolCall {
@@ -110,18 +110,23 @@ fn logged_gate_records_allow_and_deny_and_passes_the_decision_through() {
 
     let mut allow = AllowAll;
     let mut deny = DenyAll;
-    let allowed = LoggedGate::new(&mut allow, &mut log).decide(&call);
-    let denied = LoggedGate::new(&mut deny, &mut log).decide(&call);
+    let allowed = {
+        let mut recorder = Recorder::new(&mut allow, &mut log);
+        recorder.on_message(&Message::user_text("go"));
+        recorder.decide(&call)
+    };
+    let denied = Recorder::new(&mut deny, &mut log).decide(&call);
 
     assert_eq!(allowed, Decision::Allow);
     assert_eq!(denied, Decision::Deny("test".to_string()));
     let events = read_events(log.path()).unwrap();
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[0]["event"], "decision");
-    assert_eq!(events[0]["tool"], "shell");
-    assert_eq!(events[0]["decision"], "allow");
-    assert_eq!(events[1]["decision"], json!({ "deny": "test" }));
-    assert!(render_event(&events[1]).starts_with("[decision] c1 shell -> "));
+    assert_eq!(events.len(), 3);
+    assert_eq!(events[0]["event"], "message");
+    assert_eq!(events[1]["event"], "decision");
+    assert_eq!(events[1]["tool"], "shell");
+    assert_eq!(events[1]["decision"], "allow");
+    assert_eq!(events[2]["decision"], json!({ "deny": "test" }));
+    assert!(render_event(&events[2]).starts_with("[decision] c1 shell -> "));
 }
 
 #[test]

@@ -20,6 +20,7 @@ Keel 不附着于任何现有 harness，也不吸收 PIRA。PIRA 保持为独立
 
 | 规则 | 含义 | 可审计形式 |
 |---|---|---|
+| **Own the instruction path** | Keel 拥有从 `AGENTS.md` 到工具执行的整条指令传递路径（ContextManager、ModelAdapter、工具 schema、loop、运行时状态）。**PIRA 指令未被遵守时，默认先当作系统问题调查；在证实指令以正确的内容、优先级、运行时状态和工具语义到达模型之前，不得归因于模型能力。** 证明"这确实是模型能力边界"同样是 harness 设计者的责任。这不意味着送达即应 100% 遵守（模型是概率性的），而是 harness 有责任消掉所有其他变量 | 指令失败先走 §8 的 instruction-path audit；`--record-wire` 记录精确出站/入站请求体 |
 | **Preserve first; optimize only with evidence** | PIRA 已规定的行为默认沿用。改变实现方式须同时满足：发现明确问题；有更简单/可靠的实现；不违背 PIRA 语义、人格、方法、记忆与工具设计初衷；理由可解释可测试 | 每次偏离在 §8 登记 |
 | **One authoritative owner** | 对"最终由谁保证发生"有唯一答案；PIRA 定义行为原则、Keel 负责运行时强制，二者提及同一行为不算重复所有权 | §3 所有权表 |
 | **Problem → smallest mechanism → test → generalize** | 不按"成熟 harness 应有什么"列功能清单 | §7 每个里程碑有 observed-need gate |
@@ -172,6 +173,8 @@ shell/action execution      → approval according to current mode
 - **Why**：原则 7（保留证据与来源，不用摘要掩盖失败）；测试与审计需要完整转录。
 - **Owner**：Keel。**PIRA**：PIRA README 明确会话日志（会话中心、时间序）与 PIRA 记忆（项目中心、检索导向）互补。
 - 语义：**重建/检视**先前会话转录，**不重放执行**历史工具调用。事件日志是 provenance，不是执行脚本。日志不注入模型、不作为记忆源。
+- 记录方式：loop 通过 `Hooks::on_message` 在每条消息加入转录的那一刻通知宿主，`Recorder` 据此按真实发生顺序写入；决策事件落在触发它的 assistant 消息之后、结果消息之前。
+- 隐私：日志含完整工具输入与输出（可能包含命令输出中的敏感内容），只存于本机 `~/.keel/sessions/`，不进入仓库；分享前需人工检视。
 
 ### 5.10 会话 ID
 - 一个 Keel 进程 = 一个新的会话/线程 ID；无 resume。
@@ -226,7 +229,8 @@ A 片的一个已知真实案例：本机 `~/agent` 停在 af6a477，仍含 `pap
 - **T11 符号链接**：`Workspace::classify` 是词法判定，不解析符号链接；工作区内指向外部的链接会被判为 Inside。C 片把边界检查接到真实执行前，须对已存在的路径追加一次解析后比较（`pira_ctx` 对符号链接存储目录的态度是直接拒绝）。
 - **T13 按名字判定内部工具的绕过面**：`shell` 对 `argv[0]` 按 basename 判定是否为 PIRA 内部工具，因此模型若把一个脚本命名为 `pira_nav` 放在工作区并调用它，该命令会直接执行而不进入 `pira_ctx` 活动记忆。这与 PIRA 的信任模型一致（模型是遵循策略的行动者，不是对手；运行时强制是尽力而为），且 Codex 宿主同样存在。若日后有证据需要收紧，升级路径是只承认无目录分量的名字或与 PATH 上已安装工具解析到同一文件的路径。
 - **T14 子进程遗留**：`timeout_seconds` 到期只 kill 直接子进程（通常是 `pira_ctx`），其孙进程可能继续运行；Keel 最多等 0.5 秒读输出，然后如实标注不可用。正常退出后 Keel 等待管道关闭，命令留下的后台进程会延迟返回，与任何宿主相同。升级路径是进程组/Job Object。
-- **T15 full 模式下 `Safety:` 评审的实证缺席**：M2 C 冒烟（`docs/evidence/M2C_SMOKE_2026-09-07.md`）中，mistral-small-4-119b 在 full 模式下进行了 6 次写入尝试与 1 次删除，一次都没有打印 PIRA 要求的 `Safety:` 评审，尽管它在 M2 B 里能正确复述这条规则。这证明了"PIRA 语义安全 ≠ 运行时强制的安全"，但没有证明"Keel 应当自己判断命令语义"：一个 RiskClassifier（`cargo test` 改不改 `target/`？`python script.py` 做什么？）很可能成为看似有强制、实则判断不可靑的子系统，比明确承认 `--full` 信任模型更危险。**决策（用户，2026-09-07）**：full 模式下语义安全仍归模型/PIRA；`ask` 是默认，也是模型合规尚未被证明时的推荐模式；不基于单一模型的证据添加命令风险分类器；仅在更广泛的模型证据或出现 `ask` 无法可接受地控制的具体失败后重新审视。`--full` 的帮助文本与 host block 措辞如实描述这一保证边界。证据的适用范围限定为"本次测试的模型与运行"，不推断"本地模型 vs 闭源模型"的一般结论；其他模型跑同一探针后才开始形成模型侧证据。
+- **T15 状态：CAUSE NOT YET ISOLATED（2026-09-07 修订）。** 观察：mistral-small-4-119b 在 full 模式下 7 次相关状态变更尝试、0 次 `Safety:`。按"Own the instruction path"，在完成 instruction-path audit 之前不归因于模型，也不因此建 RiskClassifier。审计只查四件事（协议 `docs/AUDIT_T15.md`）：(1) 用 `--record-wire` 捕获实际发往 vLLM 的 `system + messages + tools`，确认 Full-Permission Behavior 原文在内且 host block 明确写着 full-permission/no-approval；(2) 用 vLLM 的 `/tokenize` 检查 chat template 渲染后 system 角色是否完整保留、未被弱化或截断；(3) 最小隔离探针：仅一条短 system 指令要求 `Safety:`，让模型创建文件；(4) 逐层恢复 PIRA 上下文（最小规则 → 完整 AGENTS.md → +host block → +完整工具 schema），看行为在哪一层变化。结论按差分结果归入：指令显著性/上下文整合问题（PIRA/Keel 呈现方式）、ModelAdapter/serving 缺陷、或模型能力边界。每个条件重复 ≥3 次。已做的宿主侧修正：host block 的 full 模式措辞改用 PIRA 自己的术语 "full-permission/no-approval mode"，消除词汇不一致这一可能原因。
+- **T15（原记录，保留为历史）full 模式下 `Safety:` 评审的实证缺席**：M2 C 冒烟（`docs/evidence/M2C_SMOKE_2026-09-07.md`）中，mistral-small-4-119b 在 full 模式下进行了 6 次写入尝试与 1 次删除，一次都没有打印 PIRA 要求的 `Safety:` 评审，尽管它在 M2 B 里能正确复述这条规则。这证明了"PIRA 语义安全 ≠ 运行时强制的安全"，但没有证明"Keel 应当自己判断命令语义"：一个 RiskClassifier（`cargo test` 改不改 `target/`？`python script.py` 做什么？）很可能成为看似有强制、实则判断不可靑的子系统，比明确承认 `--full` 信任模型更危险。**决策（用户，2026-09-07）**：full 模式下语义安全仍归模型/PIRA；`ask` 是默认，也是模型合规尚未被证明时的推荐模式；不基于单一模型的证据添加命令风险分类器；仅在更广泛的模型证据或出现 `ask` 无法可接受地控制的具体失败后重新审视。`--full` 的帮助文本与 host block 措辞如实描述这一保证边界。证据的适用范围限定为"本次测试的模型与运行"，不推断"本地模型 vs 闭源模型"的一般结论；其他模型跑同一探针后才开始形成模型侧证据。
 - **T16 `argv` 中的 shell 操作符**：同一次冒烟里模型三次把 `>` 作为独立 `argv` 元素传给 `echo`/`printf`，命令"成功"（exit 0）却没有任何效果，直到熔断。据此 Keel 在解析时拒绝独立出现的 shell 操作符并给出本平台的 shell 请求形式（不解释、只拒绝，O3 不变）；工具描述改为平台感知。`max_turns` 从 8 提到 32。这两处是"观察到需要"驱动的改动。
 - **T12 大小写**：路径分量只在 Windows 上做大小写不敏感比较；macOS 默认文件系统同样不区分大小写但未处理。影响限于边界误判为 Outside（偏保守），非安全问题。
 

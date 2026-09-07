@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
+use crate::log::SessionLog;
 use crate::message::{Block, Message, Provenance, Role, ToolSpec};
 use crate::model::{Model, ModelError};
 
@@ -201,6 +202,11 @@ pub struct OpenAiChatModel {
     base_url: String,
     api_key: String,
     model: String,
+    /// When set, every request body sent and every response body received is
+    /// appended verbatim. This is the instruction-path audit's first step
+    /// (PLAN.md §2 "Own the instruction path"): what the model was actually
+    /// sent, byte for byte, not what Keel meant to send.
+    wire_log: Option<SessionLog>,
 }
 
 impl OpenAiChatModel {
@@ -216,7 +222,18 @@ impl OpenAiChatModel {
             base_url: base_url.trim_end_matches('/').to_string(),
             api_key,
             model,
+            wire_log: None,
         }
+    }
+
+    /// Record exact request and response bodies to `log`.
+    pub fn record_wire_to(&mut self, log: SessionLog) {
+        self.wire_log = Some(log);
+    }
+
+    /// The most recent failure to write the wire log, if any.
+    pub fn take_wire_log_failure(&mut self) -> Option<String> {
+        self.wire_log.as_mut().and_then(SessionLog::take_failure)
     }
 
     /// Read `OPENAI_API_KEY` (required) and `OPENAI_BASE_URL` (optional).
@@ -256,7 +273,19 @@ impl Model for OpenAiChatModel {
         tools: &[ToolSpec],
     ) -> Result<Message, ModelError> {
         let body = to_wire(&self.model, system, messages, tools)?;
-        let response = self.post_chat_completion(&body)?;
-        from_wire(&response)
+        if let Some(log) = &mut self.wire_log {
+            log.record(json!({ "event": "request", "body": body }));
+        }
+        let response = self.post_chat_completion(&body);
+        if let Some(log) = &mut self.wire_log {
+            match &response {
+                Ok(body) => log.record(json!({ "event": "response", "body": body })),
+                Err(error) => log.record(json!({
+                    "event": "response_error",
+                    "error": error.to_string(),
+                })),
+            }
+        }
+        from_wire(&response?)
     }
 }

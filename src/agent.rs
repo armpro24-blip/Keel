@@ -20,16 +20,24 @@ pub enum Decision {
     Deny(String),
 }
 
-/// The hook between "the model asked" and "Keel did". The PermissionEngine
-/// implements it; the session log will observe it (PLAN.md §5.6, §5.9).
-pub trait ToolGate {
+/// What the loop tells the host while it runs (PLAN.md §5.6, §5.9).
+///
+/// `decide` sits between "the model asked" and "Keel did"; the
+/// PermissionEngine implements it. `on_message` fires the moment a message
+/// joins the transcript, so a session log can record events in the order
+/// they happened instead of reconstructing it afterwards. Hosts that record
+/// nothing keep the default no-op.
+pub trait Hooks {
     fn decide(&mut self, call: &ToolCall) -> Decision;
+
+    fn on_message(&mut self, _message: &Message) {}
 }
 
-/// A gate that allows everything: for tests and for hosts without permissions.
+/// Hooks that allow everything and record nothing: for tests and for hosts
+/// without permissions.
 pub struct AllowAll;
 
-impl ToolGate for AllowAll {
+impl Hooks for AllowAll {
     fn decide(&mut self, _call: &ToolCall) -> Decision {
         Decision::Allow
     }
@@ -81,8 +89,9 @@ impl AgentLoop {
     ///
     /// Each turn: call the model; if it made no tool calls, its text is the
     /// final answer. Otherwise, for every tool call in declaration order, ask
-    /// the gate, execute when allowed, and collect the observation; return all
-    /// observations in one message and call the model again.
+    /// the hooks, execute when allowed, and collect the observation; return
+    /// all observations in one message and call the model again. Every
+    /// message is reported to the hooks as soon as it is appended.
     ///
     /// On error the transcript keeps whatever was appended before the
     /// failure, so the caller can inspect it.
@@ -90,12 +99,13 @@ impl AgentLoop {
         &self,
         model: &mut dyn Model,
         tools: &mut ToolRegistry,
-        gate: &mut dyn ToolGate,
+        hooks: &mut dyn Hooks,
         transcript: &mut Vec<Message>,
         user_input: &str,
     ) -> Result<RunOutcome, LoopError> {
         let specs = tools.specs();
         transcript.push(Message::user_text(user_input));
+        hooks.on_message(transcript.last().expect("just pushed"));
 
         for turn in 1..=self.max_turns {
             let reply = model
@@ -104,6 +114,7 @@ impl AgentLoop {
             let calls = reply.tool_calls();
             let reply_text = reply.text();
             transcript.push(reply);
+            hooks.on_message(transcript.last().expect("just pushed"));
 
             if calls.is_empty() {
                 return Ok(RunOutcome {
@@ -116,7 +127,7 @@ impl AgentLoop {
             // at most one live capture per thread (PLAN.md §5.3, T8).
             let mut results = Vec::with_capacity(calls.len());
             for call in calls {
-                let result = match gate.decide(&call) {
+                let result = match hooks.decide(&call) {
                     Decision::Deny(reason) => ToolResult::error(format!("not executed: {reason}")),
                     Decision::Allow => match tools.get_mut(&call.name) {
                         Some(tool) => tool.execute(&call.input),
@@ -134,6 +145,7 @@ impl AgentLoop {
                 role: Role::User,
                 blocks: results,
             });
+            hooks.on_message(transcript.last().expect("just pushed"));
         }
 
         Err(LoopError::MaxTurnsExceeded {

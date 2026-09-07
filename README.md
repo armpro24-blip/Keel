@@ -84,8 +84,16 @@ M2 in progress. Done so far:
   safety policy, and a working directory outside the workspace always asks.
 - M3: every session is recorded as append-only JSONL under
   `~/.keel/sessions/<workspace>/<session>.jsonl` (messages, gate decisions,
-  run outcomes); `keel log show FILE` renders it for inspection without
-  re-running anything.
+  run outcomes, in the order they happened); `keel log show FILE` renders it
+  for inspection without re-running anything. `--record-wire` additionally
+  records every exact request and response body exchanged with the model,
+  the first step of an instruction-path audit (`docs/AUDIT_T15.md`).
+
+Keel owns the instruction-delivery path. When the model does not follow a
+PIRA instruction, that is investigated as a system problem first; it is
+attributed to the model only after Keel has verified that the instruction
+reached the model with the correct content, precedence, runtime state, and
+tool semantics (`PLAN.md` §2).
 
 Not yet: compaction. It arrives only when an observed need requires it
 (`PLAN.md` §7).

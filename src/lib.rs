@@ -16,7 +16,7 @@
 //! - [`model`]: the model boundary (`Model` trait) and the scripted `FakeModel`.
 //! - [`openai`]: the first real adapter, OpenAI Chat Completions.
 //! - [`tool`]: the tool boundary (`Tool` trait), the registry, and the `EchoTool`.
-//! - [`agent`]: the `AgentLoop` and the `ToolGate` consulted before every dispatch.
+//! - [`agent`]: the `AgentLoop` and the `Hooks` it reports to (decisions before dispatch, messages as they join).
 //! - [`workspace`]: workspace identity (same rule as `pira_ctx`) and boundary.
 //! - [`pira`]: the installed PIRA: policy sources, contract checks, `pira.lock`.
 //! - [`context`]: the system instruction: `AGENTS.md` verbatim plus the host block.
