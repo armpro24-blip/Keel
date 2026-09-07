@@ -8,11 +8,18 @@ use std::fmt;
 
 use crate::message::{Message, ToolSpec};
 
+/// Why a model call failed. The variants name who is at fault so that a
+/// failure message never blames the provider for a Keel-side mistake.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModelError {
     /// A `FakeModel` was asked for more replies than it was scripted with.
     ScriptExhausted,
-    /// A real adapter failed. The string is the provider's own message.
+    /// Keel handed the adapter a transcript that breaks the message contract,
+    /// for example a tool call inside a user message. This is a Keel bug.
+    InvalidTranscript(String),
+    /// The provider or the transport failed, or the provider returned a body
+    /// the adapter cannot interpret. The string is the provider's own message
+    /// or the adapter's description of what was malformed.
     Provider(String),
 }
 
@@ -20,7 +27,8 @@ impl fmt::Display for ModelError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ModelError::ScriptExhausted => write!(f, "fake model script exhausted"),
-            ModelError::Provider(message) => write!(f, "model provider error: {message}"),
+            ModelError::InvalidTranscript(detail) => write!(f, "invalid transcript: {detail}"),
+            ModelError::Provider(detail) => write!(f, "model provider error: {detail}"),
         }
     }
 }
@@ -41,8 +49,11 @@ pub trait Model {
     ) -> Result<Message, ModelError>;
 }
 
-/// A model that replays scripted replies and records what it was shown.
+/// A test facility: a model that replays scripted replies and records what
+/// it was shown.
 ///
+/// It lives in the library, not behind `cfg(test)`, because integration tests
+/// and downstream experiments need it; nothing in the runtime constructs it.
 /// `seen` lets tests assert that observations actually reached the model
 /// instead of trusting the loop's own transcript.
 pub struct FakeModel {

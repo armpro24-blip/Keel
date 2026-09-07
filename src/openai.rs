@@ -18,16 +18,15 @@ use crate::model::{Model, ModelError};
 
 pub const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 
+/// Upper bound for one round trip. Generous because a long completion is
+/// legitimate; the bound exists so a dead server cannot hang the REPL forever.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
+
 /// Build the request body for `POST {base_url}/chat/completions`.
 ///
-/// Mapping:
-/// - `system` becomes the leading `system` message;
-/// - a user `Text` block becomes a `user` message;
-/// - a user `ToolResult` block becomes a `tool` message (one per result, as
-///   the API requires); an error result is prefixed with `[tool error]`
-///   because the wire format has no error flag;
-/// - an assistant message carries its text as `content` and its tool calls as
-///   `tool_calls`, with `arguments` serialized to a JSON string.
+/// `system` becomes the leading `system` message; see `user_wire_messages`
+/// and `assistant_wire_message` for the per-role mapping. `tools` is omitted
+/// from the body when empty.
 pub fn to_wire(
     model: &str,
     system: &str,
@@ -35,89 +34,98 @@ pub fn to_wire(
     tools: &[ToolSpec],
 ) -> Result<Value, ModelError> {
     let mut wire_messages = vec![json!({ "role": "system", "content": system })];
-
     for message in messages {
         match message.role {
-            Role::User => {
-                for block in &message.blocks {
-                    match block {
-                        Block::Text(text) => {
-                            wire_messages.push(json!({ "role": "user", "content": text }));
-                        }
-                        Block::ToolResult {
-                            call_id,
-                            output,
-                            is_error,
-                        } => {
-                            let content = if *is_error {
-                                format!("[tool error] {output}")
-                            } else {
-                                output.clone()
-                            };
-                            wire_messages.push(json!({
-                                "role": "tool",
-                                "tool_call_id": call_id,
-                                "content": content,
-                            }));
-                        }
-                        Block::ToolCall { .. } => {
-                            return Err(ModelError::Provider(
-                                "user message cannot contain a tool call".to_string(),
-                            ));
-                        }
-                    }
-                }
-            }
-            Role::Assistant => {
-                let mut tool_calls = Vec::new();
-                for block in &message.blocks {
-                    match block {
-                        Block::Text(_) => {}
-                        Block::ToolCall { id, name, input } => tool_calls.push(json!({
-                            "id": id,
-                            "type": "function",
-                            "function": { "name": name, "arguments": input.to_string() },
-                        })),
-                        Block::ToolResult { .. } => {
-                            return Err(ModelError::Provider(
-                                "assistant message cannot contain a tool result".to_string(),
-                            ));
-                        }
-                    }
-                }
-                let text = message.text();
-                let mut wire = json!({ "role": "assistant" });
-                wire["content"] = if text.is_empty() {
-                    Value::Null
-                } else {
-                    Value::String(text)
-                };
-                if !tool_calls.is_empty() {
-                    wire["tool_calls"] = Value::Array(tool_calls);
-                }
-                wire_messages.push(wire);
-            }
+            Role::User => wire_messages.extend(user_wire_messages(message)?),
+            Role::Assistant => wire_messages.push(assistant_wire_message(message)?),
         }
     }
 
     let mut body = json!({ "model": model, "messages": wire_messages });
     if !tools.is_empty() {
-        let wire_tools: Vec<Value> = tools
-            .iter()
-            .map(|tool| {
-                json!({
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.input_schema,
-                    },
-                })
-            })
-            .collect();
+        let wire_tools: Vec<Value> = tools.iter().map(tool_wire).collect();
         body["tools"] = Value::Array(wire_tools);
     }
     Ok(body)
+}
+
+/// A user message becomes one wire message per block: `Text` → `user`,
+/// `ToolResult` → `tool` (the API wants one `tool` message per result).
+/// An error result is prefixed with `[tool error]` because the wire format
+/// has no error flag.
+fn user_wire_messages(message: &Message) -> Result<Vec<Value>, ModelError> {
+    let mut wire = Vec::with_capacity(message.blocks.len());
+    for block in &message.blocks {
+        match block {
+            Block::Text(text) => wire.push(json!({ "role": "user", "content": text })),
+            Block::ToolResult {
+                call_id,
+                output,
+                is_error,
+            } => {
+                let content = if *is_error {
+                    format!("[tool error] {output}")
+                } else {
+                    output.clone()
+                };
+                wire.push(json!({
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": content,
+                }));
+            }
+            Block::ToolCall { .. } => {
+                return Err(ModelError::InvalidTranscript(
+                    "user message cannot contain a tool call".to_string(),
+                ));
+            }
+        }
+    }
+    Ok(wire)
+}
+
+/// An assistant message carries its text as `content` (null when empty) and
+/// its tool calls as `tool_calls`, with `arguments` serialized to a JSON string.
+fn assistant_wire_message(message: &Message) -> Result<Value, ModelError> {
+    let mut tool_calls = Vec::new();
+    for block in &message.blocks {
+        match block {
+            Block::Text(_) => {}
+            Block::ToolCall { id, name, input } => tool_calls.push(json!({
+                "id": id,
+                "type": "function",
+                "function": { "name": name, "arguments": input.to_string() },
+            })),
+            Block::ToolResult { .. } => {
+                return Err(ModelError::InvalidTranscript(
+                    "assistant message cannot contain a tool result".to_string(),
+                ));
+            }
+        }
+    }
+
+    let text = message.text();
+    let content = if text.is_empty() {
+        Value::Null
+    } else {
+        Value::String(text)
+    };
+    let mut wire = json!({ "role": "assistant", "content": content });
+    if !tool_calls.is_empty() {
+        wire["tool_calls"] = Value::Array(tool_calls);
+    }
+    Ok(wire)
+}
+
+fn tool_wire(tool: &ToolSpec) -> Value {
+    json!({
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.input_schema,
+        },
+    })
 }
 
 /// Turn a Chat Completions response body into one assistant message.
@@ -196,7 +204,7 @@ impl OpenAiChatModel {
         // so the provider's own error message reaches `from_wire`.
         let config = ureq::Agent::config_builder()
             .http_status_as_error(false)
-            .timeout_global(Some(Duration::from_secs(300)))
+            .timeout_global(Some(REQUEST_TIMEOUT))
             .build();
         OpenAiChatModel {
             agent: config.into(),

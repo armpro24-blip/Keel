@@ -60,9 +60,12 @@ impl fmt::Display for DuplicateToolName {
 impl std::error::Error for DuplicateToolName {}
 
 /// The tools available in one session, looked up by name.
+///
+/// The name is recorded once at registration; it is the identity the model
+/// uses, so lookups compare it directly instead of rebuilding specs.
 #[derive(Default)]
 pub struct ToolRegistry {
-    tools: Vec<Box<dyn Tool>>,
+    tools: Vec<(String, Box<dyn Tool>)>,
 }
 
 impl ToolRegistry {
@@ -72,24 +75,24 @@ impl ToolRegistry {
 
     pub fn register(&mut self, tool: Box<dyn Tool>) -> Result<(), DuplicateToolName> {
         let name = tool.spec().name;
-        if self.get_mut(&name).is_some() {
+        if self.tools.iter().any(|(existing, _)| *existing == name) {
             return Err(DuplicateToolName(name));
         }
-        self.tools.push(tool);
+        self.tools.push((name, tool));
         Ok(())
     }
 
     /// Specs in registration order, as shown to the model.
     pub fn specs(&self) -> Vec<ToolSpec> {
-        self.tools.iter().map(|tool| tool.spec()).collect()
+        self.tools.iter().map(|(_, tool)| tool.spec()).collect()
     }
 
     pub fn get_mut(&mut self, name: &str) -> Option<&mut dyn Tool> {
         let index = self
             .tools
             .iter()
-            .position(|tool| tool.spec().name == name)?;
-        Some(self.tools[index].as_mut())
+            .position(|(existing, _)| existing == name)?;
+        Some(self.tools[index].1.as_mut())
     }
 }
 

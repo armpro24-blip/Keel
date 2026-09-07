@@ -104,6 +104,25 @@ fn request_marks_error_results_in_content() {
 }
 
 #[test]
+fn request_rejects_a_transcript_that_breaks_the_message_contract() {
+    let tool_call_in_user_message = vec![Message {
+        role: Role::User,
+        blocks: vec![Block::ToolCall {
+            id: "c".to_string(),
+            name: "echo".to_string(),
+            input: json!({}),
+        }],
+    }];
+
+    let error = to_wire("m", "sys", &tool_call_in_user_message, &[]).unwrap_err();
+
+    assert!(
+        matches!(error, ModelError::InvalidTranscript(_)),
+        "a Keel-side contract violation must not be reported as a provider error: {error:?}"
+    );
+}
+
+#[test]
 fn response_with_text_only_is_a_final_answer() {
     let body = json!({
         "choices": [{ "message": { "role": "assistant", "content": "hello" } }]
