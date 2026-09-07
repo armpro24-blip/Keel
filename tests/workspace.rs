@@ -1,0 +1,118 @@
+//! Workspace identity and boundary tests (PLAN.md §5.7).
+
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use keel::workspace::{PathScope, Workspace};
+
+/// A fresh directory under the platform temp dir, removed on drop.
+struct TempTree {
+    path: PathBuf,
+}
+
+impl TempTree {
+    fn new(label: &str) -> TempTree {
+        let unique = format!(
+            "keel-ws-{label}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let path = std::env::temp_dir().join(unique);
+        fs::create_dir_all(&path).unwrap();
+        TempTree { path }
+    }
+}
+
+impl Drop for TempTree {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+#[test]
+fn nearest_git_ancestor_is_the_root() {
+    let tree = TempTree::new("git");
+    fs::create_dir_all(tree.path.join(".git")).unwrap();
+    let nested = tree.path.join("src").join("deep");
+    fs::create_dir_all(&nested).unwrap();
+
+    let workspace = Workspace::detect(&nested);
+
+    assert_eq!(workspace.root(), Workspace::at(&tree.path).root());
+}
+
+#[test]
+fn without_git_the_cwd_is_the_root() {
+    let tree = TempTree::new("nogit");
+    let nested = tree.path.join("work");
+    fs::create_dir_all(&nested).unwrap();
+
+    let workspace = Workspace::detect(&nested);
+
+    assert_eq!(workspace.root(), Workspace::at(&nested).root());
+}
+
+#[test]
+fn classification_distinguishes_inside_temp_and_outside() {
+    let root = Path::new(if cfg!(windows) {
+        r"C:\projects\keel"
+    } else {
+        "/projects/keel"
+    });
+    let workspace = Workspace::at(root);
+
+    assert_eq!(
+        workspace.classify(Path::new("src/main.rs")),
+        PathScope::Inside
+    );
+    assert_eq!(workspace.classify(&root.join("docs")), PathScope::Inside);
+    assert_eq!(
+        workspace.classify(&std::env::temp_dir().join("scratch.txt")),
+        PathScope::Temp
+    );
+    let outside = if cfg!(windows) {
+        r"C:\projects\other\file"
+    } else {
+        "/projects/other/file"
+    };
+    assert_eq!(workspace.classify(Path::new(outside)), PathScope::Outside);
+}
+
+#[test]
+fn parent_segments_cannot_escape_lexically() {
+    let root = Path::new(if cfg!(windows) {
+        r"C:\projects\keel"
+    } else {
+        "/projects/keel"
+    });
+    let workspace = Workspace::at(root);
+
+    assert_eq!(
+        workspace.classify(Path::new("src/../../other")),
+        PathScope::Outside
+    );
+    assert_eq!(
+        workspace.classify(Path::new("src/../docs/./x")),
+        PathScope::Inside
+    );
+}
+
+#[test]
+fn a_sibling_directory_with_the_root_as_prefix_string_is_outside() {
+    let root = Path::new(if cfg!(windows) {
+        r"C:\projects\keel"
+    } else {
+        "/projects/keel"
+    });
+    let workspace = Workspace::at(root);
+    let sibling = if cfg!(windows) {
+        r"C:\projects\keel2\file"
+    } else {
+        "/projects/keel2/file"
+    };
+
+    assert_eq!(workspace.classify(Path::new(sibling)), PathScope::Outside);
+}
