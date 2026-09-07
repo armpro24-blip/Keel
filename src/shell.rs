@@ -121,16 +121,15 @@ impl ShellRequest {
 /// Whether `program` names a PIRA internal tool, by its basename. Directory
 /// prefixes and a `.exe` suffix are ignored so that `pira_ctx`,
 /// `C:\...\pira_ctx.exe`, and `./pira_nav` are all recognized and never
-/// wrapped in a second `pira_ctx`.
+/// wrapped in a second `pira_ctx`. Both `/` and `\` count as separators on
+/// every platform: the model may write Windows paths, and no PIRA tool is
+/// ever named with a backslash.
 pub fn is_pira_internal_tool(program: &str) -> bool {
-    let Some(basename) = Path::new(program).file_name() else {
-        return false;
-    };
-    let basename = basename.to_string_lossy();
+    let basename = program.rsplit(['/', '\\']).next().unwrap_or(program);
     let stem = basename
         .strip_suffix(".exe")
         .or_else(|| basename.strip_suffix(".EXE"))
-        .unwrap_or(&basename);
+        .unwrap_or(basename);
     PIRA_INTERNAL_TOOLS
         .iter()
         .any(|tool| stem.eq_ignore_ascii_case(tool))
