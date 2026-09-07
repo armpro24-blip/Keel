@@ -105,7 +105,12 @@ fn recorder_logs_messages_and_decisions_in_order_and_passes_decisions_through() 
     let call = ToolCall {
         id: "c1".to_string(),
         name: "shell".to_string(),
-        input: json!({ "argv": ["git", "status"], "intent": "i" }),
+        input: json!({
+            "argv": ["cmd", "/C", "echo hi > f"],
+            "intent": "i",
+            "effect": "state_changing",
+            "safety_review": "Writes f; reversible."
+        }),
     };
 
     let mut allow = AllowAll;
@@ -127,6 +132,15 @@ fn recorder_logs_messages_and_decisions_in_order_and_passes_decisions_through() 
     assert_eq!(events[1]["decision"], "allow");
     assert_eq!(events[2]["decision"], json!({ "deny": "test" }));
     assert!(render_event(&events[2]).starts_with("[decision] c1 shell -> "));
+    assert_eq!(
+        events[1]["handshake"],
+        json!({
+            "effect": "state_changing",
+            "review_present": true,
+            "review_source": "model",
+            "review_validated": "presence_only"
+        })
+    );
 }
 
 #[test]

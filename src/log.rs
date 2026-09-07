@@ -17,6 +17,7 @@ use serde_json::{json, Value};
 use crate::agent::{Decision, Hooks};
 use crate::message::{Block, Message, Provenance, Role, ToolCall};
 use crate::pira::{home_dir, sha256_hex, PiraError};
+use crate::shell::{self, ShellRequest};
 
 pub struct SessionLog {
     path: PathBuf,
@@ -238,13 +239,26 @@ impl Hooks for Recorder<'_> {
             Decision::Allow => json!("allow"),
             Decision::Deny(reason) => json!({ "deny": reason }),
         };
-        self.log.record(json!({
+        let mut event = json!({
             "event": "decision",
             "call_id": call.id,
             "tool": call.name,
             "input": call.input,
             "decision": verdict,
-        }));
+        });
+        // Provenance of the handshake: the review is the model's; Keel
+        // validated only that it was present when required (PLAN.md §3).
+        if call.name == shell::TOOL_NAME {
+            if let Ok(request) = ShellRequest::parse(&call.input) {
+                event["handshake"] = json!({
+                    "effect": request.effect.as_str(),
+                    "review_present": request.review().is_some(),
+                    "review_source": "model",
+                    "review_validated": "presence_only",
+                });
+            }
+        }
+        self.log.record(event);
         decision
     }
 

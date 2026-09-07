@@ -82,6 +82,12 @@ impl Approver for StdinApprover {
         let answer = read_line().unwrap_or_default();
         matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
     }
+
+    /// The model's review, shown before its command runs. Keel adds only the
+    /// `Safety:` prefix; the text is the model's.
+    fn announce(&mut self, text: &str) {
+        eprintln!("{text}");
+    }
 }
 
 /// Print the INCOMPATIBLE state with its reasons and return the exit code.

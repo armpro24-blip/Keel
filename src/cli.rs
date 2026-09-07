@@ -13,10 +13,12 @@ env:   OPENAI_API_KEY   required for the REPL
        OPENAI_BASE_URL  optional, default https://api.openai.com/v1
 repl:  type a message and press Enter; /quit or EOF exits
 trace: --trace prints every message appended by a run to stderr
-full:  --full skips ordinary host approval and relies on the model to follow
-       PIRA's safety policy; Keel does not enforce that policy and provides no
-       sandbox. Use the default (ask) when model compliance has not been
-       demonstrated. A working directory outside the workspace always asks.
+full:  --full skips ordinary host approval and provides no sandbox. A command
+       the model declares state_changing runs only after the model's own
+       safety_review has been shown; Keel checks that the review is present
+       and precedes execution, not its content or the model's classification.
+       Use the default (ask) when that boundary is not enough. A working
+       directory outside the workspace always asks.
 pira:  `pira check` validates the PIRA installation at ~/agent against
        ~/.keel/pira.lock; `--lock` records the current state as verified
 log:   every session is recorded under ~/.keel/sessions/<workspace>/<session>.jsonl;

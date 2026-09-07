@@ -97,8 +97,14 @@ attributed to the model only after Keel has verified that the instruction
 reached the model with the correct content, precedence, runtime state, and
 tool semantics (`PLAN.md` §2).
 
-Not yet: compaction. It arrives only when an observed need requires it
-(`PLAN.md` §7).
+Pre-execution handshake (T15): every `shell` call carries the model's own
+`effect` (`read_only` | `state_changing`) and, for state-changing commands
+that would run without host approval, the model's `safety_review`. Keel
+shows that review as `Safety: …` before the command runs and refuses to run
+a declared state-changing command without one on that path. Keel checks the
+review's presence and order only: the classification and the review's
+content remain the model's, applying PIRA's Full-Permission Behavior.
+Evidence: `docs/evidence/T15_*`.
 
 ```text
 cargo test

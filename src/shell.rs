@@ -63,13 +63,55 @@ fn shell_hint() -> &'static str {
 pub struct ShellRequest {
     pub argv: Vec<String>,
     pub intent: String,
+    /// The model's judgment of this command as issued (PLAN.md §3): Keel
+    /// never infers it from `argv`.
+    pub effect: Effect,
+    /// The model's pre-execution review, PIRA's Full-Permission Behavior
+    /// applied by the model. Keel validates presence and order only.
+    pub safety_review: Option<String>,
     pub mode: Option<String>,
     pub interest: Option<String>,
     pub workdir: Option<String>,
     pub timeout_seconds: Option<u64>,
 }
 
+/// Whether a command, as issued, changes file, repository, tool, user, or
+/// system state. Declared by the model; the declaration is logged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Effect {
+    ReadOnly,
+    StateChanging,
+}
+
+impl Effect {
+    pub const NAMES: [&'static str; 2] = ["read_only", "state_changing"];
+
+    pub fn parse(name: &str) -> Option<Effect> {
+        match name {
+            "read_only" => Some(Effect::ReadOnly),
+            "state_changing" => Some(Effect::StateChanging),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Effect::ReadOnly => "read_only",
+            Effect::StateChanging => "state_changing",
+        }
+    }
+}
+
 impl ShellRequest {
+    /// The model's review with surrounding whitespace removed; `None` when
+    /// absent or blank. Presence is all Keel checks.
+    pub fn review(&self) -> Option<&str> {
+        self.safety_review
+            .as_deref()
+            .map(str::trim)
+            .filter(|review| !review.is_empty())
+    }
+
     /// Validate the tool input. Every failure is a message the model can act on.
     pub fn parse(input: &Value) -> Result<ShellRequest, String> {
         let argv = input
@@ -139,10 +181,23 @@ impl ShellRequest {
                     .ok_or("'timeout_seconds' must be a positive integer")?,
             ),
         };
+        let effect = input
+            .get("effect")
+            .and_then(Value::as_str)
+            .and_then(Effect::parse)
+            .ok_or_else(|| {
+                format!(
+                    "input needs 'effect', one of {}: your judgment of whether this command changes state",
+                    Effect::NAMES.join(", ")
+                )
+            })?;
+        let safety_review = optional_string("safety_review")?;
 
         Ok(ShellRequest {
             argv,
             intent,
+            effect,
+            safety_review,
             mode,
             interest,
             workdir,
@@ -354,7 +409,8 @@ impl Tool for ShellTool {
                  redirection, pipes, and && are not interpreted, and passing them as arguments \
                  is rejected. If you need a shell, {}. Every command runs through pira_ctx with \
                  your intent, except PIRA internal tools, which run directly. Returns stdout, \
-                 stderr, and the exit code.",
+                 stderr, and the exit code. In full-permission/no-approval mode a state_changing \
+                 command needs a safety_review before it runs.",
                 shell_hint()
             ),
             input_schema: json!({
@@ -387,9 +443,18 @@ impl Tool for ShellTool {
                         "type": "integer",
                         "minimum": 1,
                         "description": "Kill the command after this many seconds. Omit to wait."
+                    },
+                    "effect": {
+                        "type": "string",
+                        "enum": Effect::NAMES,
+                        "description": "Your judgment of this command as issued: read_only if it changes no file, repository, tool, user, or system state; otherwise state_changing."
+                    },
+                    "safety_review": {
+                        "type": "string",
+                        "description": "Required when effect is state_changing in full-permission/no-approval mode: the review PIRA's Full-Permission Behavior requires before this command. Keel shows it as 'Safety: ...' before executing."
                     }
                 },
-                "required": ["argv", "intent"]
+                "required": ["argv", "intent", "effect"]
             }),
         }
     }

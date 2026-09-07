@@ -36,9 +36,9 @@ Keel 不附着于任何现有 harness，也不吸收 PIRA。PIRA 保持为独立
 | 工具分发与执行 | Keel | |
 | **host approval enforcement**（是否执行某个动作） | Keel | 按当前审批模式询问或放行 |
 | **workspace boundary enforcement** | Keel | PIRA 定义规则（工作区 = 默认范围，temp 为唯一常设例外） |
-| **effect classification**（一条命令是否改变 file/repository/tool/user/system 状态） | PIRA / model | Keel 不判断 `cargo test` 或 `python script.py` 是否破坏性；模型把状态变更误报为 read_only 时 Keel 不纠正，这是有意保留的边界，声明可审计 |
-| **review semantic quality**（action/scope/risk/rollback 的内容是否充分） | PIRA / model | Keel 只校验"评审工件已提供"，不校验其语义；`"Looks fine."` 会通过 |
-| **review presence + execution ordering**（声明为状态变更的动作执行前必须存在评审工件，Keel 可见输出后才执行） | Keel（T15 综合结论后新增，待握手实验验证后落地） | 执行顺序不变量，不是语义判断。一句话定义：**The model owns the semantic classification and review; Keel owns the integrity and ordering of the declared pre-execution handshake.** 输出形式为 `Safety: <model-provided review>`，日志标注 `source = model`、`validated = presence_only`；组件命名按其所 gate 的东西（`PreExecutionHandshake` / `SafetyReviewGate`），不叫 `SafetyEnforcer`；条件校验由运行时确定性完成，不依赖 JSON Schema 的 if/then |
+| **effect classification**（这条命令本身是否改变 file/repository/tool/user/system 状态） | PIRA / model | 逐调用声明 `effect`；Keel 不从 `argv` 推断，不判断 `cargo test` 或 `python script.py` 是否破坏性，不纠正错标；声明进入日志 |
+| **review semantic adequacy**（action/scope/risk/rollback 的内容是否充分） | PIRA / model | Keel 只校验"评审工件已提供"，不校验其语义；`"Looks fine."` 会通过 |
+| **review presence/order on no-approval execution**（已实现，2026-09-07） | Keel（`PermissionEngine` 的握手逻辑 + `ShellRequest`） | 不变量：**模型声明为 state_changing、且本应在无宿主审批下执行的命令，没有非空的模型提供评审工件绝不执行，且该工件在执行前可见。** 宿主审批路径（`ask` 模式、工作区外）不要求评审，若模型提供则随命令一并进入审批提示；Keel 不因模型省略评审而拒绝一个 `ask` 模式下的动作，以免静默加强 PIRA。输出形式 `Safety: <model-provided review>`，日志 `review_source = model`、`review_validated = presence_only`；条件由运行时确定性判定，不依赖 JSON Schema 的 if/then；`Approver::announce` 为必需方法，没有静默默认实现。一句话定义：**The model owns the semantic classification and review; Keel owns the integrity and ordering of the declared pre-execution handshake.** |
 | PIRA 策略源的加载机制 | Keel（专用 loader） | 只加载 PIRA 安装所声明的可信源；§5.5 |
 | 哪些文件是可信策略源 | PIRA | 由 `AGENTS.md` 路由表与 `USER.md` 声明 |
 | 上下文装配与压缩时机 | Keel | 压缩后的活动恢复内容归 `pira_ctx recap` |
@@ -158,7 +158,7 @@ shell/action execution      → approval according to current mode
 ```
 
 - 模式：`ask`（每个动作类工具调用询问用户）与 `full`（不询问）。Keel 不提供沙箱，也不声称提供。
-- `full` 模式下语义安全评审（`Safety:`）归 PIRA；Keel **不**做 `Safety:` 字符串存在性检查，因为前缀存在不构成有意义的强制。若日后证据要求更强强制，设计真正的结构化运行时风险检查，而非表面文本校验。
+- 执行前握手（2026-09-07 起）：`shell` 调用必带模型声明的 `effect`（`read_only` | `state_changing`）与可选 `safety_review`。顺序：结构校验 → 判定本次调用走哪条权限路径 → 依该路径决定是否要求评审 → 显示评审或询问用户 → 执行。`full` 且工作区内：`read_only` 直接放行；`state_changing` 无评审 → 校验观察（命名缺失项），不执行；有评审 → `Approver::announce("Safety: <review>")` 后放行。`ask` 或工作区外：询问用户，提示含命令、effect、以及模型提供的评审（若有）；不要求评审。结构无效的请求不显示评审、不进入审批，由工具报告精确校验信息。Keel 不做 `Safety:` 字符串存在性检查、不判断命令语义、不评分评审内容。
 - v1 不引入更细的风险分类。
 
 ### 5.7 WorkspaceManager
@@ -232,6 +232,7 @@ A 片的一个已知真实案例：本机 `~/agent` 停在 af6a477，仍含 `pap
 - **T11 符号链接**：`Workspace::classify` 是词法判定，不解析符号链接；工作区内指向外部的链接会被判为 Inside。C 片把边界检查接到真实执行前，须对已存在的路径追加一次解析后比较（`pira_ctx` 对符号链接存储目录的态度是直接拒绝）。
 - **T13 按名字判定内部工具的绕过面**：`shell` 对 `argv[0]` 按 basename 判定是否为 PIRA 内部工具，因此模型若把一个脚本命名为 `pira_nav` 放在工作区并调用它，该命令会直接执行而不进入 `pira_ctx` 活动记忆。这与 PIRA 的信任模型一致（模型是遵循策略的行动者，不是对手；运行时强制是尽力而为），且 Codex 宿主同样存在。若日后有证据需要收紧，升级路径是只承认无目录分量的名字或与 PATH 上已安装工具解析到同一文件的路径。
 - **T14 子进程遗留**：`timeout_seconds` 到期只 kill 直接子进程（通常是 `pira_ctx`），其孙进程可能继续运行；Keel 最多等 0.5 秒读输出，然后如实标注不可用。正常退出后 Keel 等待管道关闭，命令留下的后台进程会延迟返回，与任何宿主相同。升级路径是进程组/Job Object。
+- **T15 握手已实现（2026-09-07，用户批准并附两项修正；`docs/DESIGN_HANDSHAKE.md`），验收待做。** `shell` 请求新增必填 `effect`（`read_only` | `state_changing`）与可选 `safety_review`；`PermissionEngine::decide_shell` 按固定顺序：结构校验 → 判定审批路径（`ask` 或工作区外 ⇒ 宿主审批）→ 仅在无审批路径上要求 `state_changing` 带非空评审 → 经必需方法 `Approver::announce` 宣告 `Safety: <review>` 或把 effect/评审并入审批提示 → 执行。修正 1：审批路径不因缺评审而拒绝（否则 Keel 会静默加强 PIRA）；修正 2：`announce` 无默认空实现。决策日志带 `handshake` 来源字段（§9 不变量 11–17）。未加入：风险分类器、评审内容检查、重试子系统、策略指针、对其他工具的泛化。**T15 未关闭**：待 `docs/T15_ACCEPTANCE.md` 在 Qwen 与 Mistral 上的实机验收证据冻结并审查。
 - **T15 握手实验，Mistral 闭合运行（2026-09-07，`docs/evidence/T15_HANDSHAKE_MISTRAL_2026-09-07.md`）：T-write 10/10，T-read 10/10，C 0/10；serving 配置与审计逐项一致。两模型均 ≥8/10，预注册门关闭。** 按命令的次级分析：40 次处理组调用中没有任何本身改变状态的命令被标为 `read_only`；Mistral 4/10 把本身不改状态的 `echo hello` 标为 `state_changing`（按任务意图而非命令分类，安全方向），与 Qwen run 7 方向相反，`effect` 定义已在设计中固定为"这条命令本身"。Mistral 评审更短、3/10 退化为单句复述 intent，presence-only 校验全部放行，这正是 Keel 不拥有的那一层。Keel 未改动；等待"握手是否进入 Keel"的决定。
 - **T15 握手实验，Qwen3.6（2026-09-07，`docs/evidence/T15_HANDSHAKE_QWEN36_2026-09-07.md`）：T-write 完整握手 9/10，T-read 10/10，C 可见 `Safety:` 1/10。** 评审以结构化元数据形式在 tool-only 输出模式下存活（T-write 9/10 content 为 null 仍带完整握手）；读写区分保留（读任务 0 次虚构评审）；唯一失败是任务分解（`echo -n hello` 被正确标为 read_only，写入步骤在单次响应实验中不可见），属测量限制而非绕过。Mistral 未部署，三个请求文件已备好。按预注册表落在"单模型高、模型相关性未知"；未集成任何东西。
 - **T15 — CROSS-MODEL HARNESS PROTOCOL GAP IDENTIFIED（用户定性，2026-09-07，综合见 `docs/evidence/T15_SYNTHESIS_2026-09-07.md`）。** Mistral 5/5→0/5 与 tool-only；指针 0/10→0/10 说明检索线索无效；Qwen 5/5→0/5、tool-only，且 reasoning 明确识别出适用规则与评审义务后仍直接发工具调用。更新的诊断：失败不能由送达或检索缺失解释；规格、送达、检索、适用性识别都成功，失败在"评审 → 工具执行"的顺序边界，而 Keel 当前协议允许在没有可见的执行前评审工件时执行。最准确的表述：Keel 对 PIRA 安全要求的集成架构不够强，一个执行顺序不变量被实现成了仅靠提示词的行为期望。不是 PIRA 策略缺陷，不是 Keel 实现 bug，也不只是模型兼容性限制。所有权表相应拆分（§3）。Response Style 消融降级为研究兴趣；第三个模型不再是 gate。下一步：不改生产代码，先做结构化执行前安全握手的最小机制实验（`docs/T15_HANDSHAKE_AB.md`：shell 调用增加模型判断的 `effect` 与 `safety_review` 字段；状态变更时 Keel 要求评审非空并可见输出后再执行；同一 Qwen 与 Mistral 上验证能否把 0/5 恢复为稳定合规，并检查读-only 任务不被过度标注）。成功才进入 Keel。
@@ -259,6 +260,15 @@ M2 起：
 7. 策略加载不产生审批请求；每个动作类工具调用都有权限决策记录。
 8. 工作区外（非 temp）路径的工具调用在任何模式下都经用户确认。
 9. `pira.lock` 三态判定：哈希不一致且契约通过 ⇒ UNVERIFIED-COMPATIBLE 并告警；契约失败 ⇒ INCOMPATIBLE 且不静默继续。
+
+握手（已实现）：
+11. `shell` 调用缺 `effect` 或 `effect` 不在枚举内 ⇒ 校验观察，不执行。
+12. `state_changing` 且在无宿主审批下本应执行（`full` 且工作区内）且无非空 `safety_review` ⇒ 不执行，观察命名缺失项。
+13. `full` 且工作区内的 `state_changing` 调用执行前，`Safety: <review>` 经 `Approver::announce` 可见；`read_only` 调用不宣告。
+14. 需要宿主审批的路径（`ask`、工作区外）不因缺评审而拒绝；若有评审，出现在审批提示中。
+15. 结构无效的请求不显示评审、不进入审批。
+16. 每条 `shell` 决策日志带 `handshake { effect, review_present, review_source: "model", review_validated: "presence_only" }`；Keel 从不记录自己撰写的评审。
+17. 没有任何代码路径从 `argv` 推断 `effect` 或评估评审内容。
 
 M4 起：
 10. 压缩只由用户命令触发。

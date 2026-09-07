@@ -1,4 +1,5 @@
-//! Tests for the PermissionEngine (PLAN.md §5.6; invariants 5, 7).
+//! Tests for the PermissionEngine: approval paths and the pre-execution
+//! handshake (PLAN.md §5.6; invariants 5, 7, and the handshake invariants).
 
 mod common;
 
@@ -10,18 +11,31 @@ use keel::agent::{Decision, Hooks};
 use keel::message::ToolCall;
 use keel::permission::{ApprovalMode, Approver, PermissionEngine};
 use keel::workspace::Workspace;
-use serde_json::json;
+use serde_json::{json, Value};
 
-/// Records every prompt and answers with a fixed verdict.
+/// Records every prompt and announcement; answers prompts with a fixed verdict.
+#[derive(Default)]
+struct Surface {
+    prompts: Vec<String>,
+    announcements: Vec<String>,
+}
+
 struct Recorder {
-    prompts: Rc<RefCell<Vec<String>>>,
+    surface: Rc<RefCell<Surface>>,
     verdict: bool,
 }
 
 impl Approver for Recorder {
     fn approve(&mut self, summary: &str) -> bool {
-        self.prompts.borrow_mut().push(summary.to_string());
+        self.surface.borrow_mut().prompts.push(summary.to_string());
         self.verdict
+    }
+
+    fn announce(&mut self, text: &str) {
+        self.surface
+            .borrow_mut()
+            .announcements
+            .push(text.to_string());
     }
 }
 
@@ -29,21 +43,21 @@ fn engine(
     mode: ApprovalMode,
     root: &std::path::Path,
     verdict: bool,
-) -> (PermissionEngine, Rc<RefCell<Vec<String>>>) {
-    let prompts = Rc::new(RefCell::new(Vec::new()));
+) -> (PermissionEngine, Rc<RefCell<Surface>>) {
+    let surface = Rc::new(RefCell::new(Surface::default()));
     let engine = PermissionEngine::new(
         mode,
         Workspace::at(root),
         vec!["read_pira_policy".to_string()],
         Box::new(Recorder {
-            prompts: Rc::clone(&prompts),
+            surface: Rc::clone(&surface),
             verdict,
         }),
     );
-    (engine, prompts)
+    (engine, surface)
 }
 
-fn call(name: &str, input: serde_json::Value) -> ToolCall {
+fn call(name: &str, input: Value) -> ToolCall {
     ToolCall {
         id: "c".to_string(),
         name: name.to_string(),
@@ -51,78 +65,179 @@ fn call(name: &str, input: serde_json::Value) -> ToolCall {
     }
 }
 
-fn shell_call(workdir: Option<&str>) -> ToolCall {
-    let mut input = json!({ "argv": ["git", "status"], "intent": "Inspect status" });
+fn shell_call(effect: &str, review: Option<&str>, workdir: Option<&str>) -> ToolCall {
+    let mut input = json!({
+        "argv": ["cmd", "/C", "echo hello > f.txt"],
+        "intent": "Create f.txt",
+        "effect": effect
+    });
+    if let Some(review) = review {
+        input["safety_review"] = json!(review);
+    }
     if let Some(workdir) = workdir {
         input["workdir"] = json!(workdir);
     }
     call("shell", input)
 }
 
+fn outside_dir() -> &'static str {
+    if cfg!(windows) {
+        "C:\\Windows"
+    } else {
+        "/usr"
+    }
+}
+
 #[test]
-fn policy_loading_never_asks_in_any_mode() {
+fn policy_loading_never_asks_or_announces_in_any_mode() {
     let dir = TempDir::new("perm-policy");
     for mode in [ApprovalMode::Ask, ApprovalMode::Full] {
-        let (mut engine, prompts) = engine(mode, &dir.path, false);
+        let (mut engine, surface) = engine(mode, &dir.path, false);
         let decision = engine.decide(&call("read_pira_policy", json!({ "name": "coding" })));
         assert_eq!(decision, Decision::Allow);
-        assert!(prompts.borrow().is_empty());
+        assert!(surface.borrow().prompts.is_empty());
+        assert!(surface.borrow().announcements.is_empty());
     }
 }
 
 #[test]
 fn ask_mode_asks_for_every_action_and_honors_the_answer() {
     let dir = TempDir::new("perm-ask");
-    let (mut allowing, prompts) = engine(ApprovalMode::Ask, &dir.path, true);
-    assert_eq!(allowing.decide(&shell_call(None)), Decision::Allow);
-    let summary = prompts.borrow()[0].clone();
-    assert!(
-        summary.starts_with("pira_ctx --intent \"Inspect status\" -- git status"),
-        "{summary}"
+    let (mut allowing, surface) = engine(ApprovalMode::Ask, &dir.path, true);
+    assert_eq!(
+        allowing.decide(&shell_call("state_changing", Some("Writes f.txt."), None)),
+        Decision::Allow
     );
-    assert!(summary.contains("\n  in "), "{summary}");
+    let prompt = surface.borrow().prompts[0].clone();
+    assert!(
+        prompt.starts_with("pira_ctx --intent \"Create f.txt\" -- cmd /C \"echo hello > f.txt\""),
+        "{prompt}"
+    );
+    assert!(prompt.contains("\n  effect: state_changing"), "{prompt}");
+    assert!(prompt.contains("\n  Safety: Writes f.txt."), "{prompt}");
+    assert!(
+        surface.borrow().announcements.is_empty(),
+        "ask mode shows the review in the prompt, not as an announcement"
+    );
 
     let (mut denying, _) = engine(ApprovalMode::Ask, &dir.path, false);
-    match denying.decide(&shell_call(None)) {
+    match denying.decide(&shell_call("read_only", None, None)) {
         Decision::Deny(reason) => assert!(reason.contains("declined"), "{reason}"),
         other => panic!("expected Deny, got {other:?}"),
     }
 }
 
 #[test]
-fn full_mode_allows_actions_inside_the_workspace_without_asking() {
-    let dir = TempDir::new("perm-full");
-    let (mut engine, prompts) = engine(ApprovalMode::Full, &dir.path, false);
+fn ask_mode_does_not_require_a_review_for_a_state_changing_command() {
+    // Host approval is the guarantee on this path; PIRA's review rule is for
+    // the no-approval path, and Keel must not strengthen it silently.
+    let dir = TempDir::new("perm-ask-noreview");
+    let (mut engine, surface) = engine(ApprovalMode::Ask, &dir.path, true);
 
-    assert_eq!(engine.decide(&shell_call(None)), Decision::Allow);
-    assert_eq!(engine.decide(&shell_call(Some("src"))), Decision::Allow);
-    assert_eq!(
-        engine.decide(&call("other_tool", json!({}))),
-        Decision::Allow
-    );
-    assert!(prompts.borrow().is_empty());
-}
-
-#[test]
-fn a_workdir_outside_the_workspace_asks_even_in_full_mode() {
-    let dir = TempDir::new("perm-outside");
-    let (mut engine, prompts) = engine(ApprovalMode::Full, &dir.path, false);
-    let outside = if cfg!(windows) { "C:\\Windows" } else { "/usr" };
-
-    let decision = engine.decide(&shell_call(Some(outside)));
-
-    assert!(matches!(decision, Decision::Deny(_)), "{decision:?}");
-    let prompt = prompts.borrow()[0].clone();
-    assert!(prompt.contains("(outside the workspace)"), "{prompt}");
-}
-
-#[test]
-fn malformed_shell_input_is_left_for_the_tool_to_report() {
-    let dir = TempDir::new("perm-malformed");
-    let (mut engine, prompts) = engine(ApprovalMode::Ask, &dir.path, false);
-
-    let decision = engine.decide(&call("shell", json!({ "argv": [] })));
+    let decision = engine.decide(&shell_call("state_changing", None, None));
 
     assert_eq!(decision, Decision::Allow);
-    assert!(prompts.borrow().is_empty());
+    let prompt = surface.borrow().prompts[0].clone();
+    assert!(prompt.contains("effect: state_changing"), "{prompt}");
+    assert!(!prompt.contains("Safety:"), "{prompt}");
+}
+
+#[test]
+fn full_mode_runs_read_only_commands_without_asking_or_announcing() {
+    let dir = TempDir::new("perm-full-read");
+    let (mut engine, surface) = engine(ApprovalMode::Full, &dir.path, false);
+
+    assert_eq!(
+        engine.decide(&shell_call("read_only", None, None)),
+        Decision::Allow
+    );
+    assert_eq!(
+        engine.decide(&shell_call(
+            "read_only",
+            Some("unneeded review"),
+            Some("src")
+        )),
+        Decision::Allow
+    );
+    assert!(surface.borrow().prompts.is_empty());
+    assert!(surface.borrow().announcements.is_empty());
+}
+
+#[test]
+fn full_mode_announces_the_review_before_allowing_a_state_changing_command() {
+    let dir = TempDir::new("perm-full-write");
+    let (mut engine, surface) = engine(ApprovalMode::Full, &dir.path, false);
+
+    let decision = engine.decide(&shell_call(
+        "state_changing",
+        Some("  Creates f.txt in the workspace; reversible by deletion.  "),
+        None,
+    ));
+
+    assert_eq!(decision, Decision::Allow);
+    assert_eq!(
+        surface.borrow().announcements,
+        vec!["Safety: Creates f.txt in the workspace; reversible by deletion.".to_string()]
+    );
+    assert!(surface.borrow().prompts.is_empty());
+}
+
+#[test]
+fn full_mode_refuses_a_state_changing_command_without_a_review() {
+    let dir = TempDir::new("perm-full-noreview");
+    let (mut engine, surface) = engine(ApprovalMode::Full, &dir.path, false);
+
+    for review in [None, Some("   ")] {
+        match engine.decide(&shell_call("state_changing", review, None)) {
+            Decision::Deny(reason) => {
+                assert!(reason.contains("safety_review"), "{reason}");
+                assert!(reason.contains("Full-Permission Behavior"), "{reason}");
+            }
+            other => panic!("expected Deny, got {other:?}"),
+        }
+    }
+    assert!(
+        surface.borrow().announcements.is_empty(),
+        "nothing is announced for a refused call"
+    );
+    assert!(surface.borrow().prompts.is_empty());
+}
+
+#[test]
+fn a_workdir_outside_the_workspace_asks_even_in_full_mode_and_needs_no_review() {
+    let dir = TempDir::new("perm-outside");
+    let (mut declining, surface) = engine(ApprovalMode::Full, &dir.path, false);
+
+    let decision = declining.decide(&shell_call("state_changing", None, Some(outside_dir())));
+
+    assert!(matches!(decision, Decision::Deny(_)), "{decision:?}");
+    let prompt = surface.borrow().prompts[0].clone();
+    assert!(prompt.contains("(outside the workspace)"), "{prompt}");
+    assert!(prompt.contains("effect: state_changing"), "{prompt}");
+    assert!(surface.borrow().announcements.is_empty());
+
+    let (mut approving, surface) = engine(ApprovalMode::Full, &dir.path, true);
+    approving.decide(&shell_call(
+        "state_changing",
+        Some("Lists a directory."),
+        Some(outside_dir()),
+    ));
+    assert!(surface.borrow().prompts[0].contains("Safety: Lists a directory."));
+}
+
+#[test]
+fn malformed_shell_input_is_left_for_the_tool_and_surfaces_no_review() {
+    let dir = TempDir::new("perm-malformed");
+    let (mut engine, surface) = engine(ApprovalMode::Full, &dir.path, false);
+
+    // Missing effect: structurally invalid, so the tool reports it and no
+    // review is announced even though one was supplied.
+    let decision = engine.decide(&call(
+        "shell",
+        json!({ "argv": ["cmd", "/C", "echo hi > f"], "intent": "i", "safety_review": "Writes f." }),
+    ));
+
+    assert_eq!(decision, Decision::Allow);
+    assert!(surface.borrow().prompts.is_empty());
+    assert!(surface.borrow().announcements.is_empty());
 }
