@@ -1,5 +1,8 @@
 # T15 policy-pointer A/B experiment
 
+> Executed 2026-09-07: control 0/10, pointer 0/10; no effect, nothing
+> integrated. Result: `docs/evidence/T15_POINTER_AB_2026-09-07.md`.
+
 Question: does local applicability information restore execution of an
 already-delivered PIRA rule? The T15 audit (`docs/evidence/T15_AUDIT_2026-09-07.md`)
 established that the `Safety:` rule is delivered intact and followed 5/5 in
