@@ -1,0 +1,19 @@
+[package]
+name = "keel"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "A minimal, rigorous agent harness that gives PIRA agency."
+publish = false
+
+# One package, library + binary. No workspace until a concrete separation
+# pressure appears (PLAN.md §O7).
+
+[dependencies]
+# Tool inputs are JSON in every model provider's tool-use API, so the neutral
+# message types carry JSON values; owning a JSON parser would be worse than
+# depending on serde_json.
+serde_json = "1"
+# M1: the smallest suitable synchronous HTTP client (PLAN.md §5.2, §6). No
+# application async runtime; ureq brings its own TLS and blocks the caller.
+ureq = { version = "3", features = ["json"] }
