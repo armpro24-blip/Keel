@@ -1,33 +1,36 @@
 //! M1 binary: a stdin/stdout REPL over one real model (PLAN.md §7, M1).
 //!
 //! No PIRA, shell, permissions, or persistence yet. The only tool is `echo`,
-//! kept so the real model's tool-use behavior can be observed.
+//! kept so the real model's tool-use behavior can be observed; `--trace`
+//! prints every message a run appended so that behavior is visible.
 
 use std::io::{self, BufRead, Write};
 
 use keel::agent::AgentLoop;
-use keel::message::Message;
+use keel::message::{Block, Message, Role};
 use keel::openai::OpenAiChatModel;
 use keel::tool::{EchoTool, ToolRegistry};
 
-const USAGE: &str = "usage: keel --model NAME   (or set OPENAI_MODEL)
+const USAGE: &str = "usage: keel --model NAME [--trace]   (or set OPENAI_MODEL)
        keel --help | --version
 env:   OPENAI_API_KEY   required
        OPENAI_BASE_URL  optional, default https://api.openai.com/v1
-repl:  type a message and press Enter; /quit or EOF exits";
+repl:  type a message and press Enter; /quit or EOF exits
+trace: --trace prints every message appended by a run to stderr";
 
 const SYSTEM: &str = "You are a helpful assistant. Use the echo tool when asked to echo.";
 const MAX_TURNS: usize = 8;
 
 /// What the command line asked for.
 enum Cli {
-    Run { model: String },
+    Run { model: String, trace: bool },
     Help,
     Version,
 }
 
 fn parse_args(args: &[String]) -> Result<Cli, String> {
     let mut model = None;
+    let mut trace = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -38,6 +41,10 @@ fn parse_args(args: &[String]) -> Result<Cli, String> {
                 model = Some(value.clone());
                 index += 2;
             }
+            "--trace" => {
+                trace = true;
+                index += 1;
+            }
             "-h" | "--help" => return Ok(Cli::Help),
             "--version" => return Ok(Cli::Version),
             other => return Err(format!("unknown argument: {other}")),
@@ -46,7 +53,7 @@ fn parse_args(args: &[String]) -> Result<Cli, String> {
     let model = model
         .or_else(|| std::env::var("OPENAI_MODEL").ok())
         .ok_or_else(|| "no model given: pass --model NAME or set OPENAI_MODEL".to_string())?;
-    Ok(Cli::Run { model })
+    Ok(Cli::Run { model, trace })
 }
 
 fn usage_error(message: &str) -> ! {
@@ -55,10 +62,32 @@ fn usage_error(message: &str) -> ! {
     std::process::exit(2)
 }
 
+/// One line per block, prefixed with the role, for `--trace`.
+fn describe(message: &Message) -> String {
+    let role = match message.role {
+        Role::User => "user",
+        Role::Assistant => "assistant",
+    };
+    let lines: Vec<String> = message
+        .blocks
+        .iter()
+        .map(|block| match block {
+            Block::Text(text) => format!("  text: {text}"),
+            Block::ToolCall { id, name, input } => format!("  tool_call {id}: {name}({input})"),
+            Block::ToolResult {
+                call_id,
+                output,
+                is_error,
+            } => format!("  tool_result {call_id} (error={is_error}): {output}"),
+        })
+        .collect();
+    format!("[{role}]\n{}", lines.join("\n"))
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let model_name = match parse_args(&args) {
-        Ok(Cli::Run { model }) => model,
+    let (model_name, trace) = match parse_args(&args) {
+        Ok(Cli::Run { model, trace }) => (model, trace),
         Ok(Cli::Help) => {
             println!("{USAGE}");
             return;
@@ -106,7 +135,15 @@ fn main() {
         if input == "/quit" {
             break;
         }
-        match agent.run(&mut model, &mut tools, &mut transcript, input) {
+
+        let before = transcript.len();
+        let outcome = agent.run(&mut model, &mut tools, &mut transcript, input);
+        if trace {
+            for message in &transcript[before..] {
+                eprintln!("{}", describe(message));
+            }
+        }
+        match outcome {
             Ok(outcome) => println!("{}", outcome.final_text),
             Err(error) => eprintln!("error: {error}"),
         }
