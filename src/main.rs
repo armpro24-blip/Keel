@@ -23,7 +23,11 @@ use keel::shell::ShellTool;
 use keel::tool::ToolRegistry;
 use keel::workspace::Workspace;
 
-const MAX_TURNS: usize = 8;
+/// Model calls per user input before the fuse blows. Eight sufficed for M0
+/// tests; a real multi-step task with a couple of retries needs more
+/// (`docs/evidence/M2C_SMOKE_2026-09-07.md`). The fuse still exists only to
+/// stop a non-converging loop, so it stays far below "unbounded".
+const MAX_TURNS: usize = 32;
 
 /// Write one line to stdout. A closed pipe (`keel pira check | head -1`) is
 /// the reader's choice, not a fault: stop quietly instead of panicking.

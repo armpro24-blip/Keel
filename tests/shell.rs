@@ -145,6 +145,37 @@ fn parse_validates_argv_intent_mode_and_timeout() {
 }
 
 #[test]
+fn standalone_shell_operators_in_argv_are_rejected_with_a_shell_hint() {
+    for operator in ["|", "&&", ";", ">", ">>", "<", "2>"] {
+        let input = json!({
+            "argv": ["echo", "hello", operator, "keel_smoke.txt"],
+            "intent": "Create a file"
+        });
+        let error = ShellRequest::parse(&input).unwrap_err();
+        assert!(
+            error.contains(&format!("'{operator}'")),
+            "{operator}: {error}"
+        );
+        assert!(error.contains("without a shell"), "{operator}: {error}");
+        assert!(
+            error.contains("request one explicitly"),
+            "{operator}: {error}"
+        );
+    }
+
+    // Operators inside one shell command string are the shell's business.
+    let via_shell = ShellRequest::parse(&json!({
+        "argv": ["sh", "-c", "echo hello > keel_smoke.txt"],
+        "intent": "Create a file"
+    }));
+    assert!(via_shell.is_ok());
+
+    // A program named like an operator is still checked only from argv[1].
+    let program_only = ShellRequest::parse(&json!({ "argv": [">"], "intent": "odd" }));
+    assert!(program_only.is_ok());
+}
+
+#[test]
 fn run_process_passes_the_thread_id_and_workdir_and_reports_the_exit_code() {
     let temp = std::env::temp_dir();
     let command = if cfg!(windows) {

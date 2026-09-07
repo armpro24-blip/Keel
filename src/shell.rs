@@ -37,6 +37,27 @@ pub const MAX_INTENT_BYTES: usize = 256;
 
 const MODES: [&str; 4] = ["auto", "check", "capture", "exact"];
 
+/// Shell operators that are never meant as a program's own argument. Keel
+/// interprets no shell syntax; it refuses these as standalone `argv` elements
+/// so a misfire (`echo hello > file` printing `hello > file`, exit 0) becomes
+/// a first-turn correction instead of a silent no-op. Evidence:
+/// `docs/evidence/M2C_SMOKE_2026-09-07.md`.
+const SHELL_OPERATORS: [&str; 11] = [
+    "|", "||", "&&", ";", ">", ">>", "<", "<<", "2>", "2>>", "&>",
+];
+
+/// How to get a shell on this platform, for the tool description and for
+/// the operator error message. Built-ins of `cmd` (`dir`, `type`, `copy`) are
+/// not programs and need `cmd /C`.
+fn shell_hint() -> &'static str {
+    if cfg!(windows) {
+        "request one explicitly: [\"powershell\",\"-Command\",\"...\"] or [\"cmd\",\"/C\",\"...\"]; \
+         cmd built-ins such as dir, type, copy are not programs"
+    } else {
+        "request one explicitly: [\"sh\",\"-c\",\"...\"] or [\"bash\",\"-lc\",\"...\"]"
+    }
+}
+
 /// A validated request from the model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShellRequest {
@@ -62,6 +83,18 @@ impl ShellRequest {
             .ok_or("every element of 'argv' must be a string")?;
         if argv.is_empty() {
             return Err("'argv' must contain the program as its first element".to_string());
+        }
+        if let Some(operator) = argv[1..]
+            .iter()
+            .find(|part| SHELL_OPERATORS.contains(&part.as_str()))
+        {
+            return Err(format!(
+                "'argv' contains the shell operator '{operator}' as a separate argument, but argv \
+                 runs without a shell, so it would be passed literally to {}; to use redirection \
+                 or pipes, {}",
+                argv[0],
+                shell_hint()
+            ));
         }
 
         let intent = input
@@ -316,11 +349,14 @@ impl Tool for ShellTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
             name: TOOL_NAME.to_string(),
-            description: "Run a program with arguments (no shell interpretation; request a shell \
-                          explicitly, e.g. [\"bash\",\"-lc\",\"...\"]). Every command is run through \
-                          pira_ctx with your intent, except PIRA internal tools, which run directly. \
-                          Returns stdout, stderr, and the exit code."
-                .to_string(),
+            description: format!(
+                "Run a program with arguments. argv is executed directly, with no shell: \
+                 redirection, pipes, and && are not interpreted, and passing them as arguments \
+                 is rejected. If you need a shell, {}. Every command runs through pira_ctx with \
+                 your intent, except PIRA internal tools, which run directly. Returns stdout, \
+                 stderr, and the exit code.",
+                shell_hint()
+            ),
             input_schema: json!({
                 "type": "object",
                 "properties": {
