@@ -1,6 +1,6 @@
 //! Deterministic tests for the agent loop (PLAN.md §7 M0, §9 invariants 1–2).
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use keel::agent::{AgentLoop, AllowAll, Decision, Hooks, LoopError};
@@ -355,4 +355,71 @@ fn hooks_see_every_message_in_the_order_it_joins_the_transcript() {
     );
     assert_eq!(order.decisions, 1);
     assert_eq!(order.roles.len(), transcript.len());
+}
+
+/// Hooks and a tool that write to one shared event list, so a test can see
+/// the exact interleaving of gate decisions and executions.
+struct Trail(Rc<RefCell<Vec<String>>>);
+
+impl Hooks for Trail {
+    fn decide(&mut self, call: &ToolCall) -> Decision {
+        self.0
+            .borrow_mut()
+            .push(format!("decide {}", call.input["tag"]));
+        Decision::Allow
+    }
+}
+
+struct TrailTool(Rc<RefCell<Vec<String>>>);
+
+impl Tool for TrailTool {
+    fn spec(&self) -> ToolSpec {
+        ToolSpec {
+            name: "trail".to_string(),
+            description: String::new(),
+            input_schema: json!({ "type": "object" }),
+        }
+    }
+
+    fn execute(&mut self, input: &Value) -> ToolResult {
+        self.0
+            .borrow_mut()
+            .push(format!("execute {}", input["tag"]));
+        ToolResult::ok("ran")
+    }
+}
+
+#[test]
+fn each_call_is_decided_immediately_before_it_executes() {
+    // Anything a gate surfaces for call `b` must appear after call `a` has
+    // run, not before it: the loop decides and executes one call at a time,
+    // in declaration order.
+    let trail = Rc::new(RefCell::new(Vec::new()));
+    let mut model = FakeModel::new(vec![
+        assistant_calls(vec![
+            tool_call("a", "trail", json!({ "tag": "a" })),
+            tool_call("b", "trail", json!({ "tag": "b" })),
+        ]),
+        Message::assistant_text("done"),
+    ]);
+    let mut tools = ToolRegistry::new();
+    tools
+        .register(Box::new(TrailTool(Rc::clone(&trail))))
+        .unwrap();
+    let mut hooks = Trail(Rc::clone(&trail));
+    let mut transcript = Vec::new();
+
+    agent(3)
+        .run(&mut model, &mut tools, &mut hooks, &mut transcript, "go")
+        .unwrap();
+
+    assert_eq!(
+        *trail.borrow(),
+        vec![
+            "decide \"a\"".to_string(),
+            "execute \"a\"".to_string(),
+            "decide \"b\"".to_string(),
+            "execute \"b\"".to_string(),
+        ]
+    );
 }

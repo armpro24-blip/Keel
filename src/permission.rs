@@ -93,11 +93,15 @@ impl PermissionEngine {
 
     /// Order (PLAN.md §5.6): structural validity → which permission path
     /// applies → handshake requirement on that path → surface or ask →
-    /// execute. A structurally invalid request surfaces no review and enters
-    /// no approval; the tool reports the validation message.
+    /// execute. A structurally invalid request is denied with the parser's
+    /// message: it surfaces no review, enters no approval, and never reaches
+    /// the tool. `Allow` therefore has one meaning: this call may execute.
     fn decide_shell(&mut self, call: &ToolCall) -> Decision {
-        let Ok(request) = ShellRequest::parse(&call.input) else {
-            return Decision::Allow;
+        // `ShellRequest::parse` is the one validation authority; the engine
+        // only relays its result (the tool parses again as its own defense).
+        let request = match ShellRequest::parse(&call.input) {
+            Ok(request) => request,
+            Err(message) => return Decision::Deny(message),
         };
         let workdir = shell::resolve_workdir(self.workspace.root(), &request);
         let outside = self.workspace.classify_resolved(&workdir) == PathScope::Outside;

@@ -80,8 +80,8 @@ M2 in progress. Done so far:
 - M2 C: the `shell` tool runs every command through `pira_ctx` unless the
   program is a PIRA internal tool (PIRA master's rule as a runtime
   invariant); the PermissionEngine asks before each action by default,
-  `--full` runs without asking and relies on the model following PIRA's
-  safety policy, and a working directory outside the workspace always asks.
+  `--full` runs without asking except through the handshake below, and a
+  working directory outside the workspace always asks.
 - M3: every session is recorded as append-only JSONL under
   `~/.keel/sessions/<workspace>/<session>.jsonl` (messages, gate decisions,
   run outcomes, in the order they happened); `keel log show FILE` renders it

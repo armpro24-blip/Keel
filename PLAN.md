@@ -158,7 +158,7 @@ shell/action execution      → approval according to current mode
 ```
 
 - 模式：`ask`（每个动作类工具调用询问用户）与 `full`（不询问）。Keel 不提供沙箱，也不声称提供。
-- 执行前握手（2026-09-07 起）：`shell` 调用必带模型声明的 `effect`（`read_only` | `state_changing`）与可选 `safety_review`。顺序：结构校验 → 判定本次调用走哪条权限路径 → 依该路径决定是否要求评审 → 显示评审或询问用户 → 执行。`full` 且工作区内：`read_only` 直接放行；`state_changing` 无评审 → 校验观察（命名缺失项），不执行；有评审 → `Approver::announce("Safety: <review>")` 后放行。`ask` 或工作区外：询问用户，提示含命令、effect、以及模型提供的评审（若有）；不要求评审。结构无效的请求不显示评审、不进入审批，由工具报告精确校验信息。Keel 不做 `Safety:` 字符串存在性检查、不判断命令语义、不评分评审内容。
+- 执行前握手（2026-09-07 起）：`shell` 调用必带模型声明的 `effect`（`read_only` | `state_changing`）与可选 `safety_review`。顺序：结构校验 → 判定本次调用走哪条权限路径 → 依该路径决定是否要求评审 → 显示评审或询问用户 → 执行。`full` 且工作区内：`read_only` 直接放行；`state_changing` 无评审 → 校验观察（命名缺失项），不执行；有评审 → `Approver::announce("Safety: <review>")` 后放行。`ask` 或工作区外：询问用户，提示含命令、effect、以及模型提供的评审（若有）；不要求评审。结构无效的请求由引擎以解析器的校验信息拒绝（模型看到 `not executed: <message>`）：不显示评审、不进入审批、不进入工具；`ShellRequest::parse` 是唯一校验者，引擎只转述，工具自身的解析保留为独立防线。因此 `Decision::Allow` 只有一个含义：Keel 允许该调用进入工具执行。Keel 不做 `Safety:` 字符串存在性检查、不判断命令语义、不评分评审内容。
 - v1 不引入更细的风险分类。
 
 ### 5.7 WorkspaceManager
@@ -232,6 +232,7 @@ A 片的一个已知真实案例：本机 `~/agent` 停在 af6a477，仍含 `pap
 - **T11 符号链接**：`Workspace::classify` 是词法判定，不解析符号链接；工作区内指向外部的链接会被判为 Inside。C 片把边界检查接到真实执行前，须对已存在的路径追加一次解析后比较（`pira_ctx` 对符号链接存储目录的态度是直接拒绝）。
 - **T13 按名字判定内部工具的绕过面**：`shell` 对 `argv[0]` 按 basename 判定是否为 PIRA 内部工具，因此模型若把一个脚本命名为 `pira_nav` 放在工作区并调用它，该命令会直接执行而不进入 `pira_ctx` 活动记忆。这与 PIRA 的信任模型一致（模型是遵循策略的行动者，不是对手；运行时强制是尽力而为），且 Codex 宿主同样存在。若日后有证据需要收紧，升级路径是只承认无目录分量的名字或与 PATH 上已安装工具解析到同一文件的路径。
 - **T14 子进程遗留**：`timeout_seconds` 到期只 kill 直接子进程（通常是 `pira_ctx`），其孙进程可能继续运行；Keel 最多等 0.5 秒读输出，然后如实标注不可用。正常退出后 Keel 等待管道关闭，命令留下的后台进程会延迟返回，与任何宿主相同。升级路径是进程组/Job Object。
+- **T15 状态：CLOSE PENDING FINAL PATCH（用户决定，2026-09-07；证据 `docs/evidence/T15_ACCEPTANCE_2026-09-07.md`）。** 两模型实机验收：不变量 12、13、14、16、17 成立；15 仅 Qwen 触发；11 未触发（31 个调用全部带合法 `effect`，仅单元测试证据）。验收暴露一处记录缺陷：结构无效的 `shell` 调用被记为 `allow` 且无 handshake，随后由工具拒绝——运行时正确，记录误导。最终补丁（本条所述）：引擎以解析器信息 `Deny` 结构无效请求（`Allow` 只表示放行执行）；`keel log show` 渲染 handshake；AgentLoop 增加 decide/execute 逐调用交错测试（§9-2）。关闭条件：单元测试全过、双平台 CI 绿、在一个模型上只重跑探针 5（畸形 argv）且 decision=deny、无 handshake、无 `Safety:`、工具未执行、模型收到 `not executed: <parser message>`、`log show` 无歧义。**保留的限制**：一轮多调用的逐条公告顺序未从任一模型实机诱发，该顺序保证由确定性 AgentLoop 测试建立。Mistral A 会话原始证据中已标注的截断不阻塞关闭；仅当实验机原件仍在时补齐，不重建。
 - **T15 握手已实现（2026-09-07，用户批准并附两项修正；`docs/DESIGN_HANDSHAKE.md`），验收待做。** `shell` 请求新增必填 `effect`（`read_only` | `state_changing`）与可选 `safety_review`；`PermissionEngine::decide_shell` 按固定顺序：结构校验 → 判定审批路径（`ask` 或工作区外 ⇒ 宿主审批）→ 仅在无审批路径上要求 `state_changing` 带非空评审 → 经必需方法 `Approver::announce` 宣告 `Safety: <review>` 或把 effect/评审并入审批提示 → 执行。修正 1：审批路径不因缺评审而拒绝（否则 Keel 会静默加强 PIRA）；修正 2：`announce` 无默认空实现。决策日志带 `handshake` 来源字段（§9 不变量 11–17）。未加入：风险分类器、评审内容检查、重试子系统、策略指针、对其他工具的泛化。**T15 未关闭**：待 `docs/T15_ACCEPTANCE.md` 在 Qwen 与 Mistral 上的实机验收证据冻结并审查。
 - **T15 握手实验，Mistral 闭合运行（2026-09-07，`docs/evidence/T15_HANDSHAKE_MISTRAL_2026-09-07.md`）：T-write 10/10，T-read 10/10，C 0/10；serving 配置与审计逐项一致。两模型均 ≥8/10，预注册门关闭。** 按命令的次级分析：40 次处理组调用中没有任何本身改变状态的命令被标为 `read_only`；Mistral 4/10 把本身不改状态的 `echo hello` 标为 `state_changing`（按任务意图而非命令分类，安全方向），与 Qwen run 7 方向相反，`effect` 定义已在设计中固定为"这条命令本身"。Mistral 评审更短、3/10 退化为单句复述 intent，presence-only 校验全部放行，这正是 Keel 不拥有的那一层。Keel 未改动；等待"握手是否进入 Keel"的决定。
 - **T15 握手实验，Qwen3.6（2026-09-07，`docs/evidence/T15_HANDSHAKE_QWEN36_2026-09-07.md`）：T-write 完整握手 9/10，T-read 10/10，C 可见 `Safety:` 1/10。** 评审以结构化元数据形式在 tool-only 输出模式下存活（T-write 9/10 content 为 null 仍带完整握手）；读写区分保留（读任务 0 次虚构评审）；唯一失败是任务分解（`echo -n hello` 被正确标为 read_only，写入步骤在单次响应实验中不可见），属测量限制而非绕过。Mistral 未部署，三个请求文件已备好。按预注册表落在"单模型高、模型相关性未知"；未集成任何东西。
@@ -250,7 +251,7 @@ A 片的一个已知真实案例：本机 `~/agent` 停在 af6a477，仍含 `pap
 
 M0 起：
 1. loop 在 `max_turns` 内终止，或以显式错误结束。
-2. 同一 assistant 轮内的多个 ToolCall 按声明顺序执行，结果按同一顺序返回。
+2. 同一 assistant 轮内的多个 ToolCall 按声明顺序执行，结果按同一顺序返回；每个调用的权限决策紧接在它自己的执行之前（decide a → execute a → decide b → execute b），不会把一轮的决策全部前置。
 
 M2 起：
 3. 非 PIRA 内部工具的每次 shell 执行都经由 `pira_ctx`（对子进程 argv 断言）；内部工具判定对 basename/路径/`.exe` 形态一致。
@@ -266,8 +267,8 @@ M2 起：
 12. `state_changing` 且在无宿主审批下本应执行（`full` 且工作区内）且无非空 `safety_review` ⇒ 不执行，观察命名缺失项。
 13. `full` 且工作区内的 `state_changing` 调用执行前，`Safety: <review>` 经 `Approver::announce` 可见；`read_only` 调用不宣告。
 14. 需要宿主审批的路径（`ask`、工作区外）不因缺评审而拒绝；若有评审，出现在审批提示中。
-15. 结构无效的请求不显示评审、不进入审批。
-16. 每条 `shell` 决策日志带 `handshake { effect, review_present, review_source: "model", review_validated: "presence_only" }`；Keel 从不记录自己撰写的评审。
+15. 结构无效的 `shell` 请求以解析器的校验信息被拒绝：不显示评审、不进入审批、不进入工具。
+16. 每条结构有效的 `shell` 决策日志带 `handshake { effect, review_present, review_source: "model", review_validated: "presence_only" }`，`keel log show` 渲染之；结构无效的 `shell` 调用以解析器的理由被拒绝且没有 handshake，因为不存在有效的 ShellRequest。Keel 从不记录自己撰写的评审。
 17. 没有任何代码路径从 `argv` 推断 `effect` 或评估评审内容。
 
 M4 起：

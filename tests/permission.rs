@@ -226,18 +226,33 @@ fn a_workdir_outside_the_workspace_asks_even_in_full_mode_and_needs_no_review() 
 }
 
 #[test]
-fn malformed_shell_input_is_left_for_the_tool_and_surfaces_no_review() {
+fn malformed_shell_input_is_denied_with_the_parser_message_and_surfaces_no_review() {
+    // `Allow` means "may execute"; a request that cannot be parsed never
+    // gets it. The parser's message is the denial reason, so the model sees
+    // `not executed: <message>` and no review is shown for a call that
+    // could not run.
     let dir = TempDir::new("perm-malformed");
-    let (mut engine, surface) = engine(ApprovalMode::Full, &dir.path, false);
+    for mode in [ApprovalMode::Full, ApprovalMode::Ask] {
+        let (mut engine, surface) = engine(mode, &dir.path, true);
 
-    // Missing effect: structurally invalid, so the tool reports it and no
-    // review is announced even though one was supplied.
-    let decision = engine.decide(&call(
-        "shell",
-        json!({ "argv": ["cmd", "/C", "echo hi > f"], "intent": "i", "safety_review": "Writes f." }),
-    ));
+        let missing_effect = engine.decide(&call(
+            "shell",
+            json!({ "argv": ["cmd", "/C", "echo hi > f"], "intent": "i", "safety_review": "Writes f." }),
+        ));
+        let string_argv = engine.decide(&call(
+            "shell",
+            json!({ "argv": "echo hi", "intent": "i", "effect": "read_only" }),
+        ));
 
-    assert_eq!(decision, Decision::Allow);
-    assert!(surface.borrow().prompts.is_empty());
-    assert!(surface.borrow().announcements.is_empty());
+        match missing_effect {
+            Decision::Deny(reason) => assert!(reason.contains("'effect'"), "{reason}"),
+            other => panic!("expected Deny, got {other:?}"),
+        }
+        match string_argv {
+            Decision::Deny(reason) => assert!(reason.contains("'argv'"), "{reason}"),
+            other => panic!("expected Deny, got {other:?}"),
+        }
+        assert!(surface.borrow().prompts.is_empty());
+        assert!(surface.borrow().announcements.is_empty());
+    }
 }

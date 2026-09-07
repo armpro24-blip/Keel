@@ -1,8 +1,13 @@
 # Design: pre-execution safety handshake
 
-Status: approved 2026-09-07 with two corrections and **implemented** at the
-commit that adds this note; live acceptance (`docs/T15_ACCEPTANCE.md`)
-pending before T15 closes. The two corrections:
+Status: approved 2026-09-07 with two corrections and **implemented**; live
+acceptance on both models recorded in
+`docs/evidence/T15_ACCEPTANCE_2026-09-07.md`. Final patch after acceptance
+(user decision): a structurally invalid request is denied with the parser's
+message instead of passed through as `Allow`, so `Allow` has one meaning;
+`keel log show` renders the handshake; the loop's per-call decide/execute
+interleaving is pinned by a test. T15 status: CLOSE PENDING FINAL PATCH,
+closing on a probe-5 rerun (`docs/T15_ACCEPTANCE.md`, addendum). The two corrections:
 
 1. `safety_review` is mandatory only when the model declares
    `state_changing` **and** the command would otherwise execute without host
@@ -100,7 +105,8 @@ per call, in the loop's sequential order, before that call executes.
 
 ```text
 1. structural validation of the whole request     (argv, operators, intent, mode, timeout, effect)
-      invalid → the tool reports the validation message; nothing runs; no review surfaced
+      invalid → denied with the parser's message (`not executed: <message>`); nothing runs;
+                no review surfaced; the tool is never reached
 2. which permission path applies                  (ask mode or outside the workspace → host approval)
 3. handshake requirement on that path
       host approval path      → review optional
@@ -116,8 +122,8 @@ per call, in the loop's sequential order, before that call executes.
 | Part | Component | Change |
 |---|---|---|
 | Parse `effect`, `safety_review` | `shell::ShellRequest::parse` (structural); `ShellRequest::review()` returns the trimmed non-empty review | Structural failures produce `ToolResult::error` observations via the tool, as today |
-| Surface the review before execution | `permission::PermissionEngine::decide_shell` | Approval paths: the command, working directory, declared effect, and any supplied review go into the `approve(summary)` prompt. No-approval path: `Approver::announce` (required method) receives `Safety: <model-provided review>` for a valid state-changing request before `Decision::Allow`; the REPL prints it to stderr. Read-only requests announce nothing. Structurally invalid requests pass through unannounced so the tool reports the precise message |
-| Provenance | `log::Recorder` decision event | For `shell` calls, add `handshake: { effect, review_present, review_source: "model", review_validated: "presence_only" }`. The review text is already in the logged `input` |
+| Surface the review before execution | `permission::PermissionEngine::decide_shell` | Approval paths: the command, working directory, declared effect, and any supplied review go into the `approve(summary)` prompt. No-approval path: `Approver::announce` (required method) receives `Safety: <model-provided review>` for a valid state-changing request before `Decision::Allow`; the REPL prints it to stderr. Read-only requests announce nothing. Structurally invalid requests are denied with the parser's message and surface nothing; `Allow` means only that the call may execute |
+| Provenance | `log::Recorder` decision event; `keel log show` | For structurally valid `shell` calls, add `handshake: { effect, review_present, review_source: "model", review_validated: "presence_only" }` and render it on the decision line. A malformed call has no handshake; its denial carries the parser's reason. The review text is already in the logged `input` |
 | Emission text | REPL | `Safety: <model-provided review>` verbatim; Keel adds only the prefix and never rewrites the text |
 | Docs | PLAN §3, §5.4, §5.6, §9 | Ownership rows below; invariants below |
 
@@ -144,8 +150,11 @@ review and does not require a review; full mode read-only neither asks nor
 announces; full mode state-changing announces then allows; full mode
 state-changing without or with a blank review is refused with the naming
 message; outside the workspace asks even in full mode and needs no review;
-malformed input is left to the tool and surfaces no review. `tests/log.rs`:
-decision events carry the handshake provenance.
+malformed input is denied with the parser's message in both modes and
+surfaces no review. `tests/log.rs`: decision events carry the handshake
+provenance and `log show` renders it. `tests/loop.rs`: two calls in one
+turn interleave as decide a, execute a, decide b, execute b (a general
+AgentLoop invariant, PLAN §9-2).
 
 ## Deliberately not in this design
 

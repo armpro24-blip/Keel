@@ -165,15 +165,23 @@ pub fn render_event(event: &Value) -> String {
                 .unwrap_or_default();
             format!("[{role}]\n{}", lines.join("\n"))
         }
-        "decision" => format!(
-            "[decision] {} {} -> {}",
-            event.get("call_id").and_then(Value::as_str).unwrap_or("?"),
-            event.get("tool").and_then(Value::as_str).unwrap_or("?"),
-            event
-                .get("decision")
-                .map(Value::to_string)
-                .unwrap_or_default()
-        ),
+        "decision" => {
+            let mut line = format!(
+                "[decision] {} {} -> {}",
+                event.get("call_id").and_then(Value::as_str).unwrap_or("?"),
+                event.get("tool").and_then(Value::as_str).unwrap_or("?"),
+                event
+                    .get("decision")
+                    .map(Value::to_string)
+                    .unwrap_or_default()
+            );
+            // Present on every structurally valid shell decision; absent when
+            // the call was denied as malformed, since no request existed.
+            if let Some(handshake) = event.get("handshake") {
+                line.push_str(&format!(" handshake={handshake}"));
+            }
+            line
+        }
         other => {
             let mut rest = event.clone();
             if let Some(object) = rest.as_object_mut() {
@@ -247,7 +255,9 @@ impl Hooks for Recorder<'_> {
             "decision": verdict,
         });
         // Provenance of the handshake: the review is the model's; Keel
-        // validated only that it was present when required (PLAN.md §3).
+        // validated only that it was present when required (PLAN.md §3). A
+        // malformed call has no request and therefore no handshake; its
+        // denial carries the parser's reason instead.
         if call.name == shell::TOOL_NAME {
             if let Ok(request) = ShellRequest::parse(&call.input) {
                 event["handshake"] = json!({

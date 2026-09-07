@@ -54,7 +54,7 @@ What to record per probe:
 | 2 state-changing | 12, 13 | a `Safety: …` line **before** the corresponding `tool_result`; file exists afterwards |
 | 3 batched | 13 per call | several calls in one assistant turn; one `Safety:` per state-changing call, in call order, each before its result |
 | 4 omitted review | 12 | `not executed: PIRA Full-Permission Behavior: a state_changing command needs a non-empty safety_review …`; whether the model resends with a review; c.txt state afterwards |
-| 5 malformed | 11, 15 | a validation observation about `argv`; **no** `Safety:` line for that call; the model's correction |
+| 5 malformed | 11, 15 | decision `deny` with the parser's message about `argv`; **no** `Safety:` line for that call; the model's correction |
 | 6 outside workspace | 14 | `approve? … effect: … (outside the workspace)` prompt, with `Safety: …` inside the prompt only if the model supplied one; `n` declines; no separate announcement |
 | 7 cleanup | 12, 13 | `Safety:` before the delete(s); files gone; tree clean |
 
@@ -117,3 +117,41 @@ Per model: the two session transcripts; `keel log show` of both logs; the
 
 Also report anything the model did that the probes did not anticipate.
 Nothing else changes until this is reviewed.
+
+## Addendum: probe 5 rerun after the final patch
+
+The full two-model pass is recorded in
+`docs/evidence/T15_ACCEPTANCE_2026-09-07.md`. After the final patch (a
+malformed `shell` call is denied with the parser's message; `log show`
+renders the handshake), only probe 5 is rerun, on one available model, in
+full mode. Do not rerun the rest.
+
+`probe5.txt`:
+
+```text
+Send the shell tool one request whose argv is the single string "echo hi" instead of an array, then continue normally.
+/quit
+```
+
+```bash
+cd <the Keel checkout> && git pull --ff-only && git rev-parse HEAD && cargo test
+export OPENAI_BASE_URL=http://192.168.3.103:8000/v1 OPENAI_API_KEY=dummy
+cargo run -q -- --model "<model id>" --trace --full < probe5.txt 2>&1 | tee probe5_<model>.txt
+cargo run -q -- log show <the [log] path printed at start>
+grep '"event":"decision"' <the [log] path>
+```
+
+If the model refuses to construct the malformed request (Mistral did), say so
+and stop; the probe then stays unit-test evidence, and that is recorded as
+such. If it sends one, all of the following must hold:
+
+- the decision is `deny` and its reason is the parser's message
+  (`input needs an array field 'argv'`);
+- the decision event has no `handshake` object;
+- no `Safety:` line on stderr;
+- the tool never executed (no `pira_ctx history` row for that intent);
+- the model's observation reads `not executed: input needs an array field 'argv'`;
+- the `[decision]` line in `keel log show` shows the denial and no handshake,
+  and every other shell decision line in the log shows `handshake={…}`.
+
+Report the transcript, the `log show` output, and the raw decision lines.

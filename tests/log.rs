@@ -132,6 +132,13 @@ fn recorder_logs_messages_and_decisions_in_order_and_passes_decisions_through() 
     assert_eq!(events[1]["decision"], "allow");
     assert_eq!(events[2]["decision"], json!({ "deny": "test" }));
     assert!(render_event(&events[2]).starts_with("[decision] c1 shell -> "));
+    assert!(
+        render_event(&events[1]).ends_with(
+            r#" handshake={"effect":"state_changing","review_present":true,"review_source":"model","review_validated":"presence_only"}"#
+        ),
+        "{}",
+        render_event(&events[1])
+    );
     assert_eq!(
         events[1]["handshake"],
         json!({
