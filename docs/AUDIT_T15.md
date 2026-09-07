@@ -101,9 +101,10 @@ payload = {
 req = urllib.request.Request("http://192.168.3.103:8000/tokenize", data=json.dumps(payload).encode(),
                              headers={"Content-Type": "application/json", "Authorization": "Bearer dummy"})
 result = json.load(urllib.request.urlopen(req))
-open("t15_step2_tokenize.json", "w", encoding="utf-8").write(json.dumps(result))
+open("t15_step2_tokenize.json", "wb").write(json.dumps(result).encode("utf-8"))
 rendered = "".join(result.get("token_strs", []))
-open("t15_step2_rendered_prompt.txt", "w", encoding="utf-8").write(rendered)
+# Write bytes: text mode on Windows would turn \r\n into \r\r\n.
+open("t15_step2_rendered_prompt.txt", "wb").write(rendered.encode("utf-8"))
 print("token count:", result.get("count"))
 print("rendered has Full-Permission Behavior:", "Full-Permission Behavior" in rendered)
 print("rendered has exact prefix rule:", "Safety:" in rendered)
