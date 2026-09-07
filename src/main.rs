@@ -4,11 +4,16 @@
 //! The REPL does not load PIRA yet; the only tool is `echo`, kept so the real
 //! model's tool-use behavior can be observed. `--trace` prints every message
 //! a run appended so that behavior is visible.
+//!
+//! Output convention: findings and the final `state:` line go to stdout;
+//! warnings and errors go to stderr.
 
 use std::io::{self, BufRead, Write};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use keel::agent::AgentLoop;
+use keel::cli::{parse_args, Cli, USAGE};
 use keel::message::{Block, Message, Role};
 use keel::openai::OpenAiChatModel;
 use keel::pira::{
@@ -17,67 +22,8 @@ use keel::pira::{
 };
 use keel::tool::{EchoTool, ToolRegistry};
 
-const USAGE: &str = "usage: keel --model NAME [--trace]   (or set OPENAI_MODEL)
-       keel pira check [--lock]
-       keel --help | --version
-env:   OPENAI_API_KEY   required for the REPL
-       OPENAI_BASE_URL  optional, default https://api.openai.com/v1
-repl:  type a message and press Enter; /quit or EOF exits
-trace: --trace prints every message appended by a run to stderr
-pira:  `pira check` validates the PIRA installation at ~/agent against
-       ~/.keel/pira.lock; `--lock` records the current state as verified";
-
 const SYSTEM: &str = "You are a helpful assistant. Use the echo tool when asked to echo.";
 const MAX_TURNS: usize = 8;
-
-/// What the command line asked for.
-enum Cli {
-    Run { model: String, trace: bool },
-    PiraCheck { lock: bool },
-    Help,
-    Version,
-}
-
-fn parse_args(args: &[String]) -> Result<Cli, String> {
-    if args.first().map(String::as_str) == Some("pira") {
-        return parse_pira_args(&args[1..]);
-    }
-    let mut model = None;
-    let mut trace = false;
-    let mut index = 0;
-    while index < args.len() {
-        match args[index].as_str() {
-            "--model" => {
-                let value = args
-                    .get(index + 1)
-                    .ok_or_else(|| "--model needs a value".to_string())?;
-                model = Some(value.clone());
-                index += 2;
-            }
-            "--trace" => {
-                trace = true;
-                index += 1;
-            }
-            "-h" | "--help" => return Ok(Cli::Help),
-            "--version" => return Ok(Cli::Version),
-            other => return Err(format!("unknown argument: {other}")),
-        }
-    }
-    let model = model
-        .or_else(|| std::env::var("OPENAI_MODEL").ok())
-        .ok_or_else(|| "no model given: pass --model NAME or set OPENAI_MODEL".to_string())?;
-    Ok(Cli::Run { model, trace })
-}
-
-fn parse_pira_args(args: &[String]) -> Result<Cli, String> {
-    match args {
-        [command] if command == "check" => Ok(Cli::PiraCheck { lock: false }),
-        [command, flag] if command == "check" && flag == "--lock" => {
-            Ok(Cli::PiraCheck { lock: true })
-        }
-        _ => Err("expected: keel pira check [--lock]".to_string()),
-    }
-}
 
 fn usage_error(message: &str) -> ! {
     eprintln!("error: {message}");
@@ -107,25 +53,28 @@ fn describe(message: &Message) -> String {
     format!("[{role}]\n{}", lines.join("\n"))
 }
 
+/// Print the INCOMPATIBLE state with its reasons and return the exit code.
+fn incompatible(reasons: &[String]) -> i32 {
+    println!("state: INCOMPATIBLE");
+    for reason in reasons {
+        println!("  {reason}");
+    }
+    eprintln!("error: Keel cannot rely on this PIRA installation; fix the reasons above (this state is never locked)");
+    1
+}
+
 /// `keel pira check [--lock]`. Exit code: 0 for VERIFIED and
 /// UNVERIFIED-COMPATIBLE (the latter with a warning), 1 for INCOMPATIBLE.
 fn pira_check(record_lock: bool) -> i32 {
     let install = match PiraInstall::default_location() {
         Ok(install) => install,
-        Err(error) => {
-            eprintln!("INCOMPATIBLE: {error}");
-            return 1;
-        }
+        Err(error) => return incompatible(&[error.to_string()]),
     };
     println!("PIRA installation: {}", install.root().display());
 
     let policy = match install.load_policy() {
         Ok(policy) => policy,
-        Err(error) => {
-            println!("state: INCOMPATIBLE");
-            println!("  {error}");
-            return 1;
-        }
+        Err(error) => return incompatible(&[error.to_string()]),
     };
     println!("verification token: present");
     println!("policy sources: {}", policy.sources.len());
@@ -136,10 +85,7 @@ fn pira_check(record_lock: bool) -> i32 {
     let file_failures = install.check_files(&policy);
     let tools = probe_tools();
     for (tool, version) in &tools {
-        match version {
-            Some(version) => println!("tool {tool}: {version}"),
-            None => println!("tool {tool}: not found"),
-        }
+        println!("tool {tool}: {}", version.as_deref().unwrap_or("not found"));
     }
     let source_commit = install.source_commit();
     println!(
@@ -154,11 +100,7 @@ fn pira_check(record_lock: bool) -> i32 {
     let files = if file_failures.is_empty() {
         match install.file_hashes(&policy) {
             Ok(files) => files,
-            Err(error) => {
-                println!("state: INCOMPATIBLE");
-                println!("  {error}");
-                return 1;
-            }
+            Err(error) => return incompatible(&[error.to_string()]),
         }
     } else {
         Default::default()
@@ -171,23 +113,19 @@ fn pira_check(record_lock: bool) -> i32 {
 
     let lock_path = match default_lock_path() {
         Ok(path) => path,
-        Err(error) => {
-            eprintln!("INCOMPATIBLE: {error}");
-            return 1;
-        }
+        Err(error) => return incompatible(&[error.to_string()]),
     };
     let lock = match Lock::read(&lock_path) {
         Ok(lock) => lock,
-        Err(error) => {
-            println!("state: INCOMPATIBLE");
-            println!("  {error}");
-            return 1;
-        }
+        Err(error) => return incompatible(&[error.to_string()]),
     };
 
     match compare(lock.as_ref(), &fingerprint, &failures) {
         Compatibility::Verified => {
             println!("state: VERIFIED (matches {})", lock_path.display());
+            if record_lock {
+                println!("lock unchanged");
+            }
             0
         }
         Compatibility::UnverifiedCompatible { drift } => {
@@ -202,18 +140,11 @@ fn pira_check(record_lock: bool) -> i32 {
                 0
             }
         }
-        Compatibility::Incompatible { failures } => {
-            println!("state: INCOMPATIBLE");
-            for failure in &failures {
-                println!("  {failure}");
-            }
-            eprintln!("error: Keel cannot rely on this PIRA installation; fix the failures above (this state is never locked)");
-            1
-        }
+        Compatibility::Incompatible { failures } => incompatible(&failures),
     }
 }
 
-fn record(fingerprint: &Fingerprint, lock_path: &std::path::Path) -> i32 {
+fn record(fingerprint: &Fingerprint, lock_path: &Path) -> i32 {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs())
@@ -285,7 +216,7 @@ fn repl(model_name: String, trace: bool) {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    match parse_args(&args) {
+    match parse_args(&args, std::env::var("OPENAI_MODEL").ok()) {
         Ok(Cli::Run { model, trace }) => repl(model, trace),
         Ok(Cli::PiraCheck { lock }) => std::process::exit(pira_check(lock)),
         Ok(Cli::Help) => println!("{USAGE}"),

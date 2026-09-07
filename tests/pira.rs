@@ -1,9 +1,13 @@
 //! Tests for reading and validating a PIRA installation and its lock
 //! (PLAN.md §4, §5.5). They use a synthetic PIRA tree, never `~/agent`.
 
+mod common;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
+
+use common::TempDir;
 
 use keel::pira::{
     compare, contract_failures, parse_routing_table, sha256_hex, Compatibility, Fingerprint, Lock,
@@ -11,6 +15,7 @@ use keel::pira::{
 };
 
 struct SyntheticPira {
+    _dir: TempDir,
     root: PathBuf,
 }
 
@@ -37,15 +42,8 @@ Load on demand (explicit or inferred):
 
 impl SyntheticPira {
     fn new(label: &str) -> SyntheticPira {
-        let unique = format!(
-            "keel-pira-{label}-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        );
-        let root = std::env::temp_dir().join(unique);
+        let dir = TempDir::new(&format!("pira-{label}"));
+        let root = dir.path.clone();
         fs::create_dir_all(root.join("modules")).unwrap();
         fs::write(
             root.join("AGENTS.md"),
@@ -63,17 +61,11 @@ impl SyntheticPira {
             "# SCIENTIFIC_WRITING\n",
         )
         .unwrap();
-        SyntheticPira { root }
+        SyntheticPira { _dir: dir, root }
     }
 
     fn install(&self) -> PiraInstall {
         PiraInstall::at(&self.root)
-    }
-}
-
-impl Drop for SyntheticPira {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
     }
 }
 
@@ -120,6 +112,39 @@ fn a_declared_path_outside_the_install_is_a_contract_failure() {
     let error = parse_routing_table(text).unwrap_err();
 
     assert!(error.0.contains("rogue"), "{error}");
+}
+
+#[test]
+fn a_declared_path_with_parent_or_current_segments_is_rejected() {
+    for path in [
+        "~/agent/../secrets",
+        "~/agent/./USER.md",
+        "~/agent/",
+        "~/agent//x",
+    ] {
+        let text = format!(
+            "## Module Loading and Routing
+- `p`: `{path}` never.
+"
+        );
+        assert!(
+            parse_routing_table(&text).is_err(),
+            "{path} must be rejected"
+        );
+    }
+}
+
+#[test]
+fn lock_without_verified_at_is_rejected() {
+    let value = serde_json::json!({
+        "schema_version": 1,
+        "files": {},
+        "tools": {},
+    });
+
+    let error = Lock::from_json(&value).unwrap_err();
+
+    assert!(error.0.contains("verified_at_unix"), "{error}");
 }
 
 #[test]

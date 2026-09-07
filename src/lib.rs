@@ -9,6 +9,7 @@
 //! ```
 //!
 //! Module map:
+//! - [`cli`]: argument parsing for the binary, kept here so it is testable.
 //! - [`message`]: provider-neutral message types shared by every component.
 //! - [`model`]: the model boundary (`Model` trait) and the scripted `FakeModel`.
 //! - [`openai`]: the first real adapter, OpenAI Chat Completions.
@@ -21,6 +22,7 @@
 //! system instruction, the shell tool, permissions, and the session log.
 
 pub mod agent;
+pub mod cli;
 pub mod message;
 pub mod model;
 pub mod openai;

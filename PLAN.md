@@ -221,7 +221,9 @@ A 片的一个已知真实案例：本机 `~/agent` 停在 af6a477，仍含 `pap
 - **T7 PIRA 工具在 PATH**：Keel 依赖 PIRA setup 安装的可执行文件；缺失时 PIRA 文本要求模型"ask for setup"，`keel pira check` 提前给出同一结论。Keel 不接管安装。
 - **T8 并行执行的未来约束**：若日后并行执行工具调用，`pira_ctx watch --current` 的"唯一 live capture"假设失效。现约定按序执行，并写成不变量。
 - **T9 `USER.md` 共享**：Keel 与 Codex 共用 `~/agent/USER.md`。同一用户、同一档案；它是私有文件，Keel 的日志与测试不得复制其内容。
-- **T10 loader 的信任来源**：loader 允许的文件集合由 `AGENTS.md` 路由表解析得出。若上游改动路由表格式导致解析失败，契约测试转为 INCOMPATIBLE，而不是 loader 静默放宽。
+- **T10 loader 的信任来源**：loader 允许的文件集合由 `AGENTS.md` 路由表解析得出。若上游改动路由表格式导致解析失败，契约测试转为 INCOMPATIBLE，而不是 loader 静默放宽。解析器接受的精确形状：`## Module Loading and Routing` 小节内、以 ``- `name`: `~/agent/relative/path` `` 开头的行；路径必须只含普通分量（拒绝 `.`、`..`、空段、绝对段）。上游若改动标题文字、路径前缀或行形状，Keel 会报 INCOMPATIBLE。
+- **T11 符号链接**：`Workspace::classify` 是词法判定，不解析符号链接；工作区内指向外部的链接会被判为 Inside。C 片把边界检查接到真实执行前，须对已存在的路径追加一次解析后比较（`pira_ctx` 对符号链接存储目录的态度是直接拒绝）。
+- **T12 大小写**：路径分量只在 Windows 上做大小写不敏感比较；macOS 默认文件系统同样不区分大小写但未处理。影响限于边界误判为 Outside（偏保守），非安全问题。
 
 ## 9. 可测试不变量
 

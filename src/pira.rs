@@ -13,7 +13,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 use serde_json::{json, Value};
@@ -213,12 +213,27 @@ pub fn parse_routing_table(agents_md: &str) -> Result<Vec<PolicySource>, PiraErr
                 "policy source '{name}' points outside {POLICY_PATH_PREFIX}: {path}"
             ))
         })?;
+        if !is_plain_relative(relative) {
+            return Err(PiraError(format!(
+                "policy source '{name}' has a path with '.', '..', or an absolute segment: {path}"
+            )));
+        }
         sources.push(PolicySource {
             name: name.to_string(),
             relative_path: relative.to_string(),
         });
     }
     Ok(sources)
+}
+
+/// True when every segment is a plain name: no `.`, `..`, root, or prefix.
+/// This keeps a declared source inside the installation even if the text
+/// tried to point elsewhere.
+fn is_plain_relative(relative: &str) -> bool {
+    !relative.is_empty()
+        && Path::new(relative)
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
@@ -347,7 +362,7 @@ impl Lock {
             verified_at_unix: value
                 .get("verified_at_unix")
                 .and_then(Value::as_u64)
-                .unwrap_or(0),
+                .ok_or_else(|| PiraError("pira.lock is missing 'verified_at_unix'".to_string()))?,
         })
     }
 
@@ -375,8 +390,13 @@ impl Lock {
         }
         let text = serde_json::to_string_pretty(&self.to_json())
             .map_err(|error| PiraError(format!("cannot serialize pira.lock: {error}")))?;
-        fs::write(path, text + "\n")
-            .map_err(|error| PiraError(format!("cannot write {}: {error}", path.display())))
+        // Write beside the target and rename so a crash never leaves a
+        // half-written lock; rename replaces an existing file on every platform.
+        let staging = path.with_extension("lock.tmp");
+        fs::write(&staging, text + "\n")
+            .map_err(|error| PiraError(format!("cannot write {}: {error}", staging.display())))?;
+        fs::rename(&staging, path)
+            .map_err(|error| PiraError(format!("cannot replace {}: {error}", path.display())))
     }
 }
 
