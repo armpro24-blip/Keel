@@ -2,8 +2,9 @@
 
     python session_stats.py <session>.jsonl
 
-Prints runs, model turns, tool calls by tool and verdict, error observations,
-denial reasons, and wall time. Reads only the log; changes nothing.
+Prints runs (including runs that ended in an error), model turns, tool calls
+by tool and verdict, error observations, denial reasons, and wall time.
+Reads only the log; changes nothing.
 """
 
 import json
@@ -14,6 +15,8 @@ from collections import Counter
 def main(path):
     events = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
     runs = [e for e in events if e.get("event") == "run_end"]
+    completed = [r for r in runs if "turns" in r]
+    failed_runs = [r["error"] for r in runs if "error" in r]
     decisions = [e for e in events if e.get("event") == "decision"]
     messages = [e for e in events if e.get("event") == "message"]
 
@@ -35,13 +38,15 @@ def main(path):
     times = [e["t"] for e in events if "t" in e]
 
     print(f"events            {len(events)}")
-    print(f"runs (user turns) {len(runs)}")
-    print(f"model calls       {sum(r['turns'] for r in runs)}")
+    print(f"runs (user turns) {len(runs)}  completed {len(completed)}  failed {len(failed_runs)}")
+    print(f"model calls       {sum(r['turns'] for r in completed)}  (completed runs only; a failed run's calls are not counted)")
     print(f"tool calls        {len(decisions)}  by tool {dict(by_tool)}")
     print(f"verdicts          {dict(verdicts)}")
     print(f"handshakes        {dict(handshakes)}  (effect, review_present) -> count")
     print(f"tool results      {len(results)}  errors {len(errors)}")
     print(f"wall time         {(max(times) - min(times)) / 1000:.1f} s")
+    for error in failed_runs:
+        print(f"run error: {error}")
     if denials:
         print("denials:")
         for reason in denials:

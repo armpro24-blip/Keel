@@ -91,8 +91,9 @@ fail, and the reason is the finding.
 
    - Approve (`y`) every action whose working directory is inside the
      repository and whose command is within the task. Decline (`n`) only a
-     command that would act outside the repository or destroy work
-     unrelated to the task; record the reason.
+     command that would act outside both the repository and the platform
+     temp directory (PIRA's standing exception for task-local temporary
+     files), or destroy work unrelated to the task; record the reason.
    - Never type hints, corrections, file contents, or commands.
    - If the model ends a turn with a question, answer only from the frozen
      task text (quote the relevant sentence), nothing more.
@@ -108,7 +109,7 @@ fail, and the reason is the finding.
    git status --short && git diff > ~/Desktop/l1_diff.patch && git diff --stat
    python -m unittest discover -s tests -v 2>&1 | tail -5
    python <Keel>/docs/dogfood/L1/acceptance/test_acceptance.py -v 2>&1 | tail -15
-   pira_ctx history --scope workspace --limit 200
+   pira_ctx history --scope workspace --limit 100
    python <Keel>/docs/dogfood/L1/tools/session_stats.py "<the [log] path>"
    python <Keel>/docs/dogfood/L1/tools/usage_from_wire.py "<the [wire] path>"
    <Keel>/target/debug/keel log show "<the [log] path>" > ~/Desktop/l1_logshow.txt
@@ -129,6 +130,13 @@ fail, and the reason is the finding.
 - Environment values from step 1 and the seed commit hash from step 2.
 - Anything the model or a tool did that looked wrong, even if the run
   passed.
+
+## Result
+
+L1 was run on 2026-09-07 and **failed** (acceptance 0/7). Evidence and the
+classified observations: `docs/evidence/L1_2026-09-07.md`. The corrections
+above to rule 4, the history limit, and `session_stats.py` were made after
+that run; the task text, seed, and acceptance tests are unchanged.
 
 ## Review by observed failure
 
