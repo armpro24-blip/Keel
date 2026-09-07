@@ -46,6 +46,37 @@ impl Workspace {
         &self.root
     }
 
+    /// `classify`, but for an existing path also compare its resolved form
+    /// (symlinks followed) against the resolved root, and report `Outside`
+    /// if either view is outside. Paths that do not exist yet are classified
+    /// lexically (PLAN.md §8 T11).
+    pub fn classify_resolved(&self, path: &Path) -> PathScope {
+        let lexical = self.classify(path);
+        if lexical == PathScope::Outside {
+            return PathScope::Outside;
+        }
+        let absolute = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            self.root.join(path)
+        };
+        match (
+            std::fs::canonicalize(&absolute),
+            std::fs::canonicalize(&self.root),
+        ) {
+            (Ok(resolved), Ok(resolved_root)) => {
+                if starts_with(&resolved, &resolved_root)
+                    || starts_with(&resolved, &canonical_temp_dir())
+                {
+                    lexical
+                } else {
+                    PathScope::Outside
+                }
+            }
+            _ => lexical,
+        }
+    }
+
     /// Classify `path`. A relative path is taken relative to the root.
     pub fn classify(&self, path: &Path) -> PathScope {
         let absolute = if path.is_absolute() {
@@ -61,6 +92,11 @@ impl Workspace {
             PathScope::Outside
         }
     }
+}
+
+fn canonical_temp_dir() -> PathBuf {
+    let temp = std::env::temp_dir();
+    std::fs::canonicalize(&temp).unwrap_or(temp)
 }
 
 fn nearest_git_root(start: &Path) -> Option<PathBuf> {

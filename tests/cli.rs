@@ -6,14 +6,23 @@ fn args(list: &[&str]) -> Vec<String> {
     list.iter().map(|arg| arg.to_string()).collect()
 }
 
+fn run(model: &str, trace: bool, full: bool) -> Cli {
+    Cli::Run {
+        model: model.to_string(),
+        trace,
+        full,
+    }
+}
+
 #[test]
-fn model_flag_and_trace() {
+fn model_flag_trace_and_full() {
     assert_eq!(
         parse_args(&args(&["--model", "m", "--trace"]), None),
-        Ok(Cli::Run {
-            model: "m".to_string(),
-            trace: true
-        })
+        Ok(run("m", true, false))
+    );
+    assert_eq!(
+        parse_args(&args(&["--full", "--model", "m"]), None),
+        Ok(run("m", false, true))
     );
 }
 
@@ -21,17 +30,11 @@ fn model_flag_and_trace() {
 fn model_falls_back_to_the_environment_and_flag_wins() {
     assert_eq!(
         parse_args(&args(&[]), Some("env-model".to_string())),
-        Ok(Cli::Run {
-            model: "env-model".to_string(),
-            trace: false
-        })
+        Ok(run("env-model", false, false))
     );
     assert_eq!(
         parse_args(&args(&["--model", "flag"]), Some("env-model".to_string())),
-        Ok(Cli::Run {
-            model: "flag".to_string(),
-            trace: false
-        })
+        Ok(run("flag", false, false))
     );
 }
 

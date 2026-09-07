@@ -92,3 +92,23 @@ fn a_sibling_directory_with_the_root_as_prefix_string_is_outside() {
 
     assert_eq!(workspace.classify(Path::new(sibling)), PathScope::Outside);
 }
+
+#[test]
+fn resolved_classification_agrees_with_lexical_for_real_directories() {
+    let tree = TempDir::new("resolved");
+    let inside = tree.path.join("inside");
+    fs::create_dir_all(&inside).unwrap();
+    let workspace = Workspace::at(&tree.path);
+
+    assert_eq!(workspace.classify_resolved(&inside), PathScope::Inside);
+    assert_eq!(
+        workspace.classify_resolved(Path::new("does-not-exist-yet")),
+        PathScope::Inside
+    );
+    let outside = if cfg!(windows) {
+        Path::new(r"C:\Windows")
+    } else {
+        Path::new("/usr")
+    };
+    assert_eq!(workspace.classify_resolved(outside), PathScope::Outside);
+}

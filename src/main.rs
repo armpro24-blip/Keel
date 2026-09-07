@@ -2,7 +2,7 @@
 //! plus `keel pira check` to validate the installed PIRA (PLAN.md §7, M1–M2).
 //!
 //! Output convention: findings and the final `state:` line go to stdout;
-//! warnings and errors go to stderr.
+//! warnings, errors, trace, and approval prompts go to stderr.
 
 use std::io::{self, BufRead, Write};
 use std::path::Path;
@@ -11,22 +11,19 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use keel::agent::AgentLoop;
 use keel::cli::{parse_args, Cli, USAGE};
 use keel::context::{ContextManager, HostInfo};
-use keel::loader::PolicyLoader;
+use keel::loader::{self, PolicyLoader};
 use keel::message::{Block, Message, Provenance, Role};
 use keel::openai::OpenAiChatModel;
+use keel::permission::{ApprovalMode, Approver, PermissionEngine};
 use keel::pira::{
     default_lock_path, inspect, Compatibility, Fingerprint, Inspection, Lock, PiraInstall,
 };
 use keel::session::{SessionId, THREAD_ID_ENV};
-use keel::tool::{EchoTool, ToolRegistry};
+use keel::shell::ShellTool;
+use keel::tool::ToolRegistry;
 use keel::workspace::Workspace;
 
 const MAX_TURNS: usize = 8;
-
-/// Until the PermissionEngine arrives (M2 slice C) Keel executes every tool
-/// call without asking, and PIRA must be told so it applies its
-/// full-permission rules.
-const APPROVAL_MODE: &str = "full (Keel asks for no approvals and provides no sandbox)";
 
 /// Write one line to stdout. A closed pipe (`keel pira check | head -1`) is
 /// the reader's choice, not a fault: stop quietly instead of panicking.
@@ -51,6 +48,32 @@ fn unix_now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_secs())
         .unwrap_or(0)
+}
+
+/// Read one line from stdin; `None` at end of input.
+fn read_line() -> Option<String> {
+    let mut line = String::new();
+    match io::stdin().lock().read_line(&mut line) {
+        Ok(0) => None,
+        Ok(_) => Some(line),
+        Err(error) => {
+            eprintln!("error: cannot read stdin: {error}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Asks the person at the REPL. Anything but `y` or `yes` declines, and end
+/// of input declines too, so a piped session can never approve by accident.
+struct StdinApprover;
+
+impl Approver for StdinApprover {
+    fn approve(&mut self, summary: &str) -> bool {
+        eprintln!("approve? {summary}");
+        eprint!("[y/N] ");
+        let answer = read_line().unwrap_or_default();
+        matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+    }
 }
 
 /// One line per block, prefixed with the role, for `--trace`.
@@ -170,7 +193,7 @@ fn record(fingerprint: &Fingerprint, lock_path: &Path) -> i32 {
 
 /// The REPL. PIRA must be readable and compatible before the model is asked
 /// anything; drift is a warning, INCOMPATIBLE refuses to start (PLAN.md §4.2).
-fn repl(model_name: String, trace: bool) {
+fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
     // Cheap configuration mistakes first, then the PIRA gate.
     let mut model = match OpenAiChatModel::from_env(model_name) {
         Ok(model) => model,
@@ -216,7 +239,7 @@ fn repl(model_name: String, trace: bool) {
         &HostInfo {
             cwd,
             workspace_root: workspace.root().to_path_buf(),
-            approval_mode: APPROVAL_MODE.to_string(),
+            approval_mode: mode.describe().to_string(),
             unix_time: unix_now(),
         },
     );
@@ -226,8 +249,17 @@ fn repl(model_name: String, trace: bool) {
         .register(Box::new(PolicyLoader::new(install, inspection.policy)))
         .expect("tool names are unique");
     tools
-        .register(Box::new(EchoTool))
+        .register(Box::new(ShellTool::new(
+            workspace.root().to_path_buf(),
+            session.as_str().to_string(),
+        )))
         .expect("tool names are unique");
+    let mut gate = PermissionEngine::new(
+        mode,
+        Workspace::at(workspace.root()),
+        vec![loader::TOOL_NAME.to_string()],
+        Box::new(StdinApprover),
+    );
     let agent = AgentLoop {
         system: context.system_instruction(),
         max_turns: MAX_TURNS,
@@ -239,20 +271,11 @@ fn repl(model_name: String, trace: bool) {
 
     // The REPL owns the transcript; the loop appends to it (PLAN.md §5.3).
     let mut transcript: Vec<Message> = Vec::new();
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
     loop {
-        print!("> ");
-        stdout.flush().expect("stdout is writable");
-        let mut line = String::new();
-        match stdin.lock().read_line(&mut line) {
-            Ok(0) => break,
-            Ok(_) => {}
-            Err(error) => {
-                eprintln!("error: cannot read stdin: {error}");
-                std::process::exit(1);
-            }
-        }
+        eprint!("> ");
+        let Some(line) = read_line() else {
+            break;
+        };
         let input = line.trim();
         if input.is_empty() {
             continue;
@@ -262,7 +285,7 @@ fn repl(model_name: String, trace: bool) {
         }
 
         let before = transcript.len();
-        let outcome = agent.run(&mut model, &mut tools, &mut transcript, input);
+        let outcome = agent.run(&mut model, &mut tools, &mut gate, &mut transcript, input);
         if trace {
             for message in &transcript[before..] {
                 eprintln!("{}", describe(message));
@@ -278,7 +301,14 @@ fn repl(model_name: String, trace: bool) {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_args(&args, std::env::var("OPENAI_MODEL").ok()) {
-        Ok(Cli::Run { model, trace }) => repl(model, trace),
+        Ok(Cli::Run { model, trace, full }) => {
+            let mode = if full {
+                ApprovalMode::Full
+            } else {
+                ApprovalMode::Ask
+            };
+            repl(model, trace, mode)
+        }
         Ok(Cli::PiraCheck { lock }) => std::process::exit(pira_check(lock)),
         Ok(Cli::Help) => say(USAGE),
         Ok(Cli::Version) => say(format!("keel {}", env!("CARGO_PKG_VERSION"))),

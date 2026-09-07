@@ -2,15 +2,38 @@
 //!
 //! Ownership (PLAN.md §3): loop execution, model invocation, and tool dispatch
 //! belong to Keel, and they all happen here. The caller owns the model, the
-//! tools, and the transcript and lends them for one run. Lending the
-//! transcript is what lets a REPL continue a conversation across inputs; in
-//! M2 the ContextManager takes over that ownership.
+//! tools, the transcript, and the gate, and lends them for one run. Lending
+//! the transcript is what lets a REPL continue a conversation across inputs;
+//! in a later slice the ContextManager takes over that ownership.
 
 use std::fmt;
 
-use crate::message::{Block, Message, Role};
+use crate::message::{Block, Message, Role, ToolCall};
 use crate::model::{Model, ModelError};
 use crate::tool::{ToolRegistry, ToolResult};
+
+/// Whether a tool call may execute. Decided before dispatch, once per call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Decision {
+    Allow,
+    /// Not executed; the reason becomes the model's observation.
+    Deny(String),
+}
+
+/// The hook between "the model asked" and "Keel did". The PermissionEngine
+/// implements it; the session log will observe it (PLAN.md §5.6, §5.9).
+pub trait ToolGate {
+    fn decide(&mut self, call: &ToolCall) -> Decision;
+}
+
+/// A gate that allows everything: for tests and for hosts without permissions.
+pub struct AllowAll;
+
+impl ToolGate for AllowAll {
+    fn decide(&mut self, _call: &ToolCall) -> Decision {
+        Decision::Allow
+    }
+}
 
 pub struct AgentLoop {
     /// System instruction text passed to the model on every call.
@@ -57,8 +80,9 @@ impl AgentLoop {
     /// final answer, appending every message produced along the way.
     ///
     /// Each turn: call the model; if it made no tool calls, its text is the
-    /// final answer. Otherwise execute every tool call in declaration order,
-    /// return all results in one message, and call the model again.
+    /// final answer. Otherwise, for every tool call in declaration order, ask
+    /// the gate, execute when allowed, and collect the observation; return all
+    /// observations in one message and call the model again.
     ///
     /// On error the transcript keeps whatever was appended before the
     /// failure, so the caller can inspect it.
@@ -66,6 +90,7 @@ impl AgentLoop {
         &self,
         model: &mut dyn Model,
         tools: &mut ToolRegistry,
+        gate: &mut dyn ToolGate,
         transcript: &mut Vec<Message>,
         user_input: &str,
     ) -> Result<RunOutcome, LoopError> {
@@ -91,9 +116,12 @@ impl AgentLoop {
             // at most one live capture per thread (PLAN.md §5.3, T8).
             let mut results = Vec::with_capacity(calls.len());
             for call in calls {
-                let result = match tools.get_mut(&call.name) {
-                    Some(tool) => tool.execute(&call.input),
-                    None => ToolResult::error(format!("unknown tool: {}", call.name)),
+                let result = match gate.decide(&call) {
+                    Decision::Deny(reason) => ToolResult::error(format!("not executed: {reason}")),
+                    Decision::Allow => match tools.get_mut(&call.name) {
+                        Some(tool) => tool.execute(&call.input),
+                        None => ToolResult::error(format!("unknown tool: {}", call.name)),
+                    },
                 };
                 results.push(Block::ToolResult {
                     call_id: call.id,

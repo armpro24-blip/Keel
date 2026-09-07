@@ -2,11 +2,12 @@
 //!
 //! Current scope (see `PLAN.md` §7): M0 and M1 are complete; M2 is in
 //! progress. Keel owns the agent loop, drives one real model over a
-//! synchronous HTTP round trip, reads and validates the installed PIRA, and
-//! puts PIRA's policy in front of the model.
+//! synchronous HTTP round trip, reads and validates the installed PIRA, puts
+//! PIRA's policy in front of the model, and lets it act through a shell tool
+//! behind a permission gate.
 //!
 //! ```text
-//! user input -> model -> tool call -> tool execution -> observation -> model -> final answer
+//! user input -> model -> tool call -> gate -> tool execution -> observation -> model -> final answer
 //! ```
 //!
 //! Module map:
@@ -15,14 +16,16 @@
 //! - [`model`]: the model boundary (`Model` trait) and the scripted `FakeModel`.
 //! - [`openai`]: the first real adapter, OpenAI Chat Completions.
 //! - [`tool`]: the tool boundary (`Tool` trait), the registry, and the `EchoTool`.
-//! - [`agent`]: the `AgentLoop`, the only place that drives a conversation.
+//! - [`agent`]: the `AgentLoop` and the `ToolGate` consulted before every dispatch.
 //! - [`workspace`]: workspace identity (same rule as `pira_ctx`) and boundary.
 //! - [`pira`]: the installed PIRA: policy sources, contract checks, `pira.lock`.
 //! - [`context`]: the system instruction: `AGENTS.md` verbatim plus the host block.
 //! - [`loader`]: the `read_pira_policy` tool, PIRA's module-loading exception.
 //! - [`session`]: one id per process, exported as `PIRA_CTX_THREAD_ID`.
+//! - [`shell`]: the `shell` tool; every command through `pira_ctx` unless it is a PIRA tool.
+//! - [`permission`]: the PermissionEngine, `ask` or `full`, outside-workspace always asks.
 //!
-//! Not yet present: the shell tool, permissions, and the session log.
+//! Not yet present: the session log and compaction.
 
 pub mod agent;
 pub mod cli;
@@ -31,7 +34,9 @@ pub mod loader;
 pub mod message;
 pub mod model;
 pub mod openai;
+pub mod permission;
 pub mod pira;
 pub mod session;
+pub mod shell;
 pub mod tool;
 pub mod workspace;

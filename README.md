@@ -77,15 +77,19 @@ M2 in progress. Done so far:
   plus a short host block; `read_pira_policy` loads declared modules exactly;
   tool results carry their provenance; one session id per process exported
   as `PIRA_CTX_THREAD_ID`.
+- M2 C: the `shell` tool runs every command through `pira_ctx` unless the
+  program is a PIRA internal tool (PIRA master's rule as a runtime
+  invariant); the PermissionEngine asks before each action by default,
+  `--full` runs without asking, and a working directory outside the
+  workspace always asks.
 
-Not yet: the shell tool through `pira_ctx`, permissions, the session log,
-compaction. Each arrives only when an observed need requires it
+Not yet: the session log and compaction. Each arrives only when an observed need requires it
 (`PLAN.md` §7).
 
 ```text
 cargo test
 keel pira check --lock
-OPENAI_API_KEY=... cargo run -- --model <model-name> [--trace]
+OPENAI_API_KEY=... cargo run -- --model <model-name> [--trace] [--full]
 ```
 
 `OPENAI_BASE_URL` overrides the endpoint for OpenAI-compatible servers,

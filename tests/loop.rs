@@ -1,9 +1,12 @@
 //! Deterministic tests for the agent loop (PLAN.md §7 M0, §9 invariants 1–2).
 
-use keel::agent::{AgentLoop, LoopError};
-use keel::message::{Block, Message, Provenance, Role};
+use std::cell::Cell;
+use std::rc::Rc;
+
+use keel::agent::{AgentLoop, AllowAll, Decision, LoopError, ToolGate};
+use keel::message::{Block, Message, Provenance, Role, ToolCall, ToolSpec};
 use keel::model::{FakeModel, ModelError};
-use keel::tool::{DuplicateToolName, EchoTool, ToolRegistry};
+use keel::tool::{DuplicateToolName, EchoTool, Tool, ToolRegistry, ToolResult};
 use serde_json::{json, Value};
 
 fn tool_call(id: &str, name: &str, input: Value) -> Block {
@@ -44,7 +47,7 @@ fn tool_round_trip_reaches_final_answer() {
     let mut transcript = Vec::new();
 
     let outcome = agent(4)
-        .run(&mut model, &mut tools, &mut transcript, "hi")
+        .run(&mut model, &mut tools, &mut AllowAll, &mut transcript, "hi")
         .unwrap();
 
     assert_eq!(outcome.final_text, "done");
@@ -74,7 +77,13 @@ fn direct_answer_needs_no_tools() {
     let mut transcript = Vec::new();
 
     let outcome = agent(1)
-        .run(&mut model, &mut tools, &mut transcript, "answer")
+        .run(
+            &mut model,
+            &mut tools,
+            &mut AllowAll,
+            &mut transcript,
+            "answer",
+        )
         .unwrap();
 
     assert_eq!(outcome.final_text, "42");
@@ -93,10 +102,22 @@ fn transcript_carries_over_between_runs() {
     let agent = agent(1);
 
     agent
-        .run(&mut model, &mut tools, &mut transcript, "one")
+        .run(
+            &mut model,
+            &mut tools,
+            &mut AllowAll,
+            &mut transcript,
+            "one",
+        )
         .unwrap();
     agent
-        .run(&mut model, &mut tools, &mut transcript, "two")
+        .run(
+            &mut model,
+            &mut tools,
+            &mut AllowAll,
+            &mut transcript,
+            "two",
+        )
         .unwrap();
 
     assert_eq!(transcript.len(), 4);
@@ -115,7 +136,13 @@ fn max_turns_is_an_explicit_fuse() {
     let mut transcript = Vec::new();
 
     let error = agent(2)
-        .run(&mut model, &mut tools, &mut transcript, "loop")
+        .run(
+            &mut model,
+            &mut tools,
+            &mut AllowAll,
+            &mut transcript,
+            "loop",
+        )
         .unwrap_err();
 
     assert_eq!(error, LoopError::MaxTurnsExceeded { max_turns: 2 });
@@ -134,7 +161,7 @@ fn unknown_tool_becomes_an_error_observation() {
     let mut transcript = Vec::new();
 
     let outcome = agent(3)
-        .run(&mut model, &mut tools, &mut transcript, "go")
+        .run(&mut model, &mut tools, &mut AllowAll, &mut transcript, "go")
         .unwrap();
 
     assert_eq!(outcome.final_text, "recovered");
@@ -167,7 +194,13 @@ fn multiple_calls_in_one_turn_return_results_in_declaration_order() {
     let mut transcript = Vec::new();
 
     agent(2)
-        .run(&mut model, &mut tools, &mut transcript, "batch")
+        .run(
+            &mut model,
+            &mut tools,
+            &mut AllowAll,
+            &mut transcript,
+            "batch",
+        )
         .unwrap();
 
     let results = &transcript[2].blocks;
@@ -197,7 +230,7 @@ fn exhausted_script_is_a_model_error() {
     let mut transcript = Vec::new();
 
     let error = agent(1)
-        .run(&mut model, &mut tools, &mut transcript, "x")
+        .run(&mut model, &mut tools, &mut AllowAll, &mut transcript, "x")
         .unwrap_err();
 
     assert_eq!(error, LoopError::Model(ModelError::ScriptExhausted));
@@ -212,4 +245,71 @@ fn duplicate_tool_names_are_rejected() {
 
     assert_eq!(error, DuplicateToolName("echo".to_string()));
     assert_eq!(tools.specs().len(), 1);
+}
+
+/// Denies everything and remembers what it was asked about.
+struct DenyAll {
+    asked: Vec<String>,
+}
+
+impl ToolGate for DenyAll {
+    fn decide(&mut self, call: &ToolCall) -> Decision {
+        self.asked.push(call.name.clone());
+        Decision::Deny("test policy".to_string())
+    }
+}
+
+/// Counts executions through a shared cell so a test can prove a denied call
+/// never ran.
+struct Counting {
+    executions: Rc<Cell<usize>>,
+}
+
+impl Tool for Counting {
+    fn spec(&self) -> ToolSpec {
+        ToolSpec {
+            name: "counting".to_string(),
+            description: String::new(),
+            input_schema: json!({ "type": "object" }),
+        }
+    }
+
+    fn execute(&mut self, _input: &Value) -> ToolResult {
+        self.executions.set(self.executions.get() + 1);
+        ToolResult::ok("ran")
+    }
+}
+
+#[test]
+fn a_denied_call_is_not_executed_and_becomes_an_error_observation() {
+    let mut model = FakeModel::new(vec![
+        assistant_calls(vec![tool_call("call-1", "counting", json!({}))]),
+        Message::assistant_text("understood"),
+    ]);
+    let executions = Rc::new(Cell::new(0));
+    let mut tools = ToolRegistry::new();
+    tools
+        .register(Box::new(Counting {
+            executions: Rc::clone(&executions),
+        }))
+        .unwrap();
+    let mut gate = DenyAll { asked: Vec::new() };
+    let mut transcript = Vec::new();
+
+    let outcome = agent(3)
+        .run(&mut model, &mut tools, &mut gate, &mut transcript, "go")
+        .unwrap();
+
+    assert_eq!(outcome.final_text, "understood");
+    assert_eq!(gate.asked, vec!["counting"]);
+    assert_eq!(executions.get(), 0, "a denied call must never execute");
+    match &transcript[2].blocks[0] {
+        Block::ToolResult {
+            output, is_error, ..
+        } => {
+            assert!(*is_error);
+            assert!(output.contains("not executed: test policy"), "{output}");
+        }
+        other => panic!("expected ToolResult, got {other:?}"),
+    }
 }

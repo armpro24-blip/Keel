@@ -4,21 +4,29 @@
 //! testable function: the environment fallback for the model name is passed
 //! in instead of read here.
 
-pub const USAGE: &str = "usage: keel --model NAME [--trace]   (or set OPENAI_MODEL)
+pub const USAGE: &str = "usage: keel --model NAME [--trace] [--full]   (or set OPENAI_MODEL)
        keel pira check [--lock]
        keel --help | --version
 env:   OPENAI_API_KEY   required for the REPL
        OPENAI_BASE_URL  optional, default https://api.openai.com/v1
 repl:  type a message and press Enter; /quit or EOF exits
 trace: --trace prints every message appended by a run to stderr
+full:  --full runs actions without asking (no sandbox); default asks before
+       each action, and a working directory outside the workspace always asks
 pira:  `pira check` validates the PIRA installation at ~/agent against
        ~/.keel/pira.lock; `--lock` records the current state as verified";
 
 /// What the command line asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cli {
-    Run { model: String, trace: bool },
-    PiraCheck { lock: bool },
+    Run {
+        model: String,
+        trace: bool,
+        full: bool,
+    },
+    PiraCheck {
+        lock: bool,
+    },
     Help,
     Version,
 }
@@ -31,6 +39,7 @@ pub fn parse_args(args: &[String], model_from_env: Option<String>) -> Result<Cli
     }
     let mut model = None;
     let mut trace = false;
+    let mut full = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -45,6 +54,10 @@ pub fn parse_args(args: &[String], model_from_env: Option<String>) -> Result<Cli
                 trace = true;
                 index += 1;
             }
+            "--full" => {
+                full = true;
+                index += 1;
+            }
             "-h" | "--help" => return Ok(Cli::Help),
             "--version" => return Ok(Cli::Version),
             other => return Err(format!("unknown argument: {other}")),
@@ -53,7 +66,7 @@ pub fn parse_args(args: &[String], model_from_env: Option<String>) -> Result<Cli
     let model = model
         .or(model_from_env)
         .ok_or_else(|| "no model given: pass --model NAME or set OPENAI_MODEL".to_string())?;
-    Ok(Cli::Run { model, trace })
+    Ok(Cli::Run { model, trace, full })
 }
 
 fn parse_pira_args(args: &[String]) -> Result<Cli, String> {
