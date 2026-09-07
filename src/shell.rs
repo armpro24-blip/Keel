@@ -209,6 +209,8 @@ pub fn run_process(
         }
         thread::sleep(Duration::from_millis(20));
     };
+    // After a normal exit the readers finish when the pipes close; a process
+    // the command left behind can delay that, exactly as it would for any host.
     let (stdout, stderr) = if status.is_some() {
         (
             stdout_rx.recv().unwrap_or_default(),
@@ -261,8 +263,12 @@ pub fn run_process(
 
 fn read_all(mut source: impl Read) -> String {
     let mut bytes = Vec::new();
-    let _ = source.read_to_end(&mut bytes);
-    String::from_utf8_lossy(&bytes).into_owned()
+    let read_error = source.read_to_end(&mut bytes).err();
+    let mut text = String::from_utf8_lossy(&bytes).into_owned();
+    if let Some(error) = read_error {
+        text.push_str(&format!("\n[read error: {error}]\n"));
+    }
+    text
 }
 
 /// The tool the model sees. It never decides whether a command may run; the
@@ -279,15 +285,31 @@ impl ShellTool {
             session_id,
         }
     }
+}
 
-    /// The directory a request runs in: `workdir` relative to the workspace
-    /// root, or the root itself.
-    pub fn resolve_workdir(workspace_root: &Path, request: &ShellRequest) -> PathBuf {
-        match &request.workdir {
-            Some(workdir) => workspace_root.join(workdir),
-            None => workspace_root.to_path_buf(),
-        }
+/// The directory a request runs in: `workdir` relative to the workspace root
+/// (an absolute `workdir` stands on its own), or the root itself.
+pub fn resolve_workdir(workspace_root: &Path, request: &ShellRequest) -> PathBuf {
+    match &request.workdir {
+        Some(workdir) => workspace_root.join(workdir),
+        None => workspace_root.to_path_buf(),
     }
+}
+
+/// One line a person can read before approving: arguments containing
+/// whitespace or quotes are double-quoted so word boundaries are unambiguous.
+pub fn display_command(command: &[String]) -> String {
+    command
+        .iter()
+        .map(|part| {
+            if part.is_empty() || part.chars().any(|c| c.is_whitespace() || c == '"') {
+                format!("\"{}\"", part.replace('"', "\\\""))
+            } else {
+                part.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl Tool for ShellTool {
@@ -341,7 +363,7 @@ impl Tool for ShellTool {
             Ok(request) => request,
             Err(message) => return ToolResult::error(message),
         };
-        let workdir = ShellTool::resolve_workdir(&self.workspace_root, &request);
+        let workdir = resolve_workdir(&self.workspace_root, &request);
         if !workdir.is_dir() {
             return ToolResult::error(format!(
                 "workdir does not exist or is not a directory: {}",

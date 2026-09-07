@@ -77,7 +77,7 @@ fn ask_mode_asks_for_every_action_and_honors_the_answer() {
     assert_eq!(allowing.decide(&shell_call(None)), Decision::Allow);
     let summary = prompts.borrow()[0].clone();
     assert!(
-        summary.starts_with("pira_ctx --intent Inspect status -- git status"),
+        summary.starts_with("pira_ctx --intent \"Inspect status\" -- git status"),
         "{summary}"
     );
     assert!(summary.contains("\n  in "), "{summary}");

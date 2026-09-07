@@ -11,6 +11,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
+#[derive(Debug, Clone)]
 pub struct Workspace {
     root: PathBuf,
 }

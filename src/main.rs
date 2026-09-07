@@ -256,7 +256,7 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
         .expect("tool names are unique");
     let mut gate = PermissionEngine::new(
         mode,
-        Workspace::at(workspace.root()),
+        workspace.clone(),
         vec![loader::TOOL_NAME.to_string()],
         Box::new(StdinApprover),
     );

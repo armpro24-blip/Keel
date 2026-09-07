@@ -12,7 +12,7 @@
 
 use crate::agent::{Decision, ToolGate};
 use crate::message::ToolCall;
-use crate::shell::{self, ShellRequest, ShellTool};
+use crate::shell::{self, ShellRequest};
 use crate::workspace::{PathScope, Workspace};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,10 +92,10 @@ impl ToolGate for PermissionEngine {
             let Ok(request) = ShellRequest::parse(&call.input) else {
                 return Decision::Allow;
             };
-            let workdir = ShellTool::resolve_workdir(self.workspace.root(), &request);
+            let workdir = shell::resolve_workdir(self.workspace.root(), &request);
             let summary = format!(
                 "{}\n  in {}",
-                shell::wrap_command(&request).join(" "),
+                shell::display_command(&shell::wrap_command(&request)),
                 workdir.display()
             );
             if self.workspace.classify_resolved(&workdir) == PathScope::Outside {

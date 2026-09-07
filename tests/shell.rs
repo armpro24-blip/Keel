@@ -8,7 +8,8 @@ use std::time::Duration;
 
 use keel::session::THREAD_ID_ENV;
 use keel::shell::{
-    is_pira_internal_tool, run_process, wrap_command, ShellRequest, MAX_INTENT_BYTES,
+    display_command, is_pira_internal_tool, run_process, wrap_command, ShellRequest,
+    MAX_INTENT_BYTES,
 };
 use serde_json::json;
 
@@ -185,10 +186,12 @@ fn run_process_reports_stderr_and_non_zero_exit_as_an_error() {
 
 #[test]
 fn run_process_kills_a_command_at_the_deadline() {
+    // Short sleepers: the grandchild outlives the kill (documented ceiling),
+    // so it should not linger for long after the test.
     let command = if cfg!(windows) {
-        echo_argv("ping -n 30 127.0.0.1 > nul")
+        echo_argv("ping -n 3 127.0.0.1 > nul")
     } else {
-        echo_argv("sleep 30")
+        echo_argv("sleep 3")
     };
 
     let result = run_process(
@@ -200,6 +203,28 @@ fn run_process_kills_a_command_at_the_deadline() {
 
     assert!(result.is_error);
     assert!(result.output.contains("[killed after"), "{}", result.output);
+}
+
+#[test]
+fn display_command_quotes_arguments_with_whitespace_or_quotes() {
+    let command: Vec<String> = [
+        "pira_ctx",
+        "--intent",
+        "Inspect repository status",
+        "--",
+        "git",
+        "log",
+        "--format=%H \"%s\"",
+        "",
+    ]
+    .iter()
+    .map(|part| part.to_string())
+    .collect();
+
+    assert_eq!(
+        display_command(&command),
+        r#"pira_ctx --intent "Inspect repository status" -- git log "--format=%H \"%s\"" """#
+    );
 }
 
 #[test]
