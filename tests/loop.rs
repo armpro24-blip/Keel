@@ -152,19 +152,26 @@ fn max_turns_is_an_explicit_fuse() {
 }
 
 #[test]
-fn unknown_tool_becomes_an_error_observation() {
+fn unknown_tool_becomes_an_error_observation_without_consulting_the_hooks() {
     let mut model = FakeModel::new(vec![
         assistant_calls(vec![tool_call("call-1", "nope", json!({}))]),
         Message::assistant_text("recovered"),
     ]);
     let mut tools = echo_registry();
+    // A gate that would deny: if the loop asked it first, the observation
+    // would read "not executed", not "unknown tool".
+    let mut gate = DenyAll { asked: Vec::new() };
     let mut transcript = Vec::new();
 
     let outcome = agent(3)
-        .run(&mut model, &mut tools, &mut AllowAll, &mut transcript, "go")
+        .run(&mut model, &mut tools, &mut gate, &mut transcript, "go")
         .unwrap();
 
     assert_eq!(outcome.final_text, "recovered");
+    assert!(
+        gate.asked.is_empty(),
+        "no permission decision for a tool that does not exist"
+    );
     match &transcript[2].blocks[0] {
         Block::ToolResult {
             call_id,

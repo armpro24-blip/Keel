@@ -15,6 +15,8 @@ use crate::tool::{ToolRegistry, ToolResult};
 /// Whether a tool call may execute. Decided before dispatch, once per call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decision {
+    /// Keel permits this call to enter tool execution. Nothing else: the
+    /// tool exists (checked before the hooks are asked) and may now run.
     Allow,
     /// Not executed; the reason becomes the model's observation.
     Deny(String),
@@ -88,10 +90,12 @@ impl AgentLoop {
     /// final answer, appending every message produced along the way.
     ///
     /// Each turn: call the model; if it made no tool calls, its text is the
-    /// final answer. Otherwise, for every tool call in declaration order, ask
-    /// the hooks, execute when allowed, and collect the observation; return
-    /// all observations in one message and call the model again. Every
-    /// message is reported to the hooks as soon as it is appended.
+    /// final answer. Otherwise, for every tool call in declaration order:
+    /// a call to a tool that does not exist becomes an error observation
+    /// without consulting the hooks; any other call is decided by the hooks
+    /// and executed when allowed. All observations return in one message and
+    /// the model is called again. Every message is reported to the hooks as
+    /// soon as it is appended.
     ///
     /// On error the transcript keeps whatever was appended before the
     /// failure, so the caller can inspect it.
@@ -127,11 +131,17 @@ impl AgentLoop {
             // at most one live capture per thread (PLAN.md §5.3, T8).
             let mut results = Vec::with_capacity(calls.len());
             for call in calls {
-                let result = match hooks.decide(&call) {
-                    Decision::Deny(reason) => ToolResult::error(format!("not executed: {reason}")),
-                    Decision::Allow => match tools.get_mut(&call.name) {
-                        Some(tool) => tool.execute(&call.input),
-                        None => ToolResult::error(format!("unknown tool: {}", call.name)),
+                // Existence is a structural fact, not a policy decision: a
+                // call to a tool that does not exist never reaches the hooks,
+                // so the host is not asked to approve it and `Allow` keeps
+                // its one meaning.
+                let result = match tools.get_mut(&call.name) {
+                    None => ToolResult::error(format!("unknown tool: {}", call.name)),
+                    Some(tool) => match hooks.decide(&call) {
+                        Decision::Deny(reason) => {
+                            ToolResult::error(format!("not executed: {reason}"))
+                        }
+                        Decision::Allow => tool.execute(&call.input),
                     },
                 };
                 results.push(Block::ToolResult {
