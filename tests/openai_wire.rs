@@ -1,6 +1,6 @@
 //! Wire-mapping tests for the OpenAI Chat Completions adapter. No network.
 
-use keel::message::{Block, Message, Role, ToolSpec};
+use keel::message::{Block, Message, Provenance, Role, ToolSpec};
 use keel::model::ModelError;
 use keel::openai::{from_wire, to_wire};
 use serde_json::json;
@@ -34,6 +34,7 @@ fn request_maps_system_user_assistant_and_tool_results() {
                 call_id: "call-1".to_string(),
                 output: "{\"n\":1}".to_string(),
                 is_error: false,
+                provenance: Provenance::Observation,
             }],
         },
     ];
@@ -95,12 +96,36 @@ fn request_marks_error_results_in_content() {
             call_id: "c".to_string(),
             output: "boom".to_string(),
             is_error: true,
+            provenance: Provenance::Observation,
         }],
     }];
 
     let body = to_wire("m", "sys", &transcript, &[]).unwrap();
 
     assert_eq!(body["messages"][1]["content"], json!("[tool error] boom"));
+}
+
+#[test]
+fn request_frames_policy_results_with_their_source() {
+    let transcript = vec![Message {
+        role: Role::User,
+        blocks: vec![Block::ToolResult {
+            call_id: "c".to_string(),
+            output: "# CODING_STYLE\nrules".to_string(),
+            is_error: false,
+            provenance: Provenance::PiraPolicy {
+                source: "~/agent/modules/CODING_STYLE.md".to_string(),
+            },
+        }],
+    }];
+
+    let body = to_wire("m", "sys", &transcript, &[]).unwrap();
+
+    assert_eq!(
+        body["messages"][1]["content"],
+        json!("<pira_policy source=\"~/agent/modules/CODING_STYLE.md\">\n# CODING_STYLE\nrules\n</pira_policy>")
+    );
+    assert_eq!(body["messages"][1]["role"], "tool");
 }
 
 #[test]

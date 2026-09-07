@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
-use crate::message::{Block, Message, Role, ToolSpec};
+use crate::message::{Block, Message, Provenance, Role, ToolSpec};
 use crate::model::{Model, ModelError};
 
 pub const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
@@ -51,8 +51,10 @@ pub fn to_wire(
 
 /// A user message becomes one wire message per block: `Text` → `user`,
 /// `ToolResult` → `tool` (the API wants one `tool` message per result).
-/// An error result is prefixed with `[tool error]` because the wire format
-/// has no error flag.
+/// The wire format has neither an error flag nor a provenance field, so both
+/// are rendered into the content: an error result is prefixed with
+/// `[tool error]`; a PIRA policy result is wrapped in a `<pira_policy>` frame
+/// that names its source path, which is what PIRA's trust rule keys on.
 fn user_wire_messages(message: &Message) -> Result<Vec<Value>, ModelError> {
     let mut wire = Vec::with_capacity(message.blocks.len());
     for block in &message.blocks {
@@ -62,11 +64,14 @@ fn user_wire_messages(message: &Message) -> Result<Vec<Value>, ModelError> {
                 call_id,
                 output,
                 is_error,
+                provenance,
             } => {
-                let content = if *is_error {
-                    format!("[tool error] {output}")
-                } else {
-                    output.clone()
+                let content = match provenance {
+                    Provenance::PiraPolicy { source } => {
+                        format!("<pira_policy source=\"{source}\">\n{output}\n</pira_policy>")
+                    }
+                    Provenance::Observation if *is_error => format!("[tool error] {output}"),
+                    Provenance::Observation => output.clone(),
                 };
                 wire.push(json!({
                     "role": "tool",

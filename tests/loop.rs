@@ -1,7 +1,7 @@
 //! Deterministic tests for the agent loop (PLAN.md §7 M0, §9 invariants 1–2).
 
 use keel::agent::{AgentLoop, LoopError};
-use keel::message::{Block, Message, Role};
+use keel::message::{Block, Message, Provenance, Role};
 use keel::model::{FakeModel, ModelError};
 use keel::tool::{DuplicateToolName, EchoTool, ToolRegistry};
 use serde_json::{json, Value};
@@ -62,6 +62,7 @@ fn tool_round_trip_reaches_final_answer() {
             call_id: "call-1".to_string(),
             output: json!({"text": "hello"}).to_string(),
             is_error: false,
+            provenance: Provenance::Observation,
         }]
     );
 }
@@ -142,6 +143,7 @@ fn unknown_tool_becomes_an_error_observation() {
             call_id,
             output,
             is_error,
+            ..
         } => {
             assert_eq!(call_id, "call-1");
             assert!(*is_error);

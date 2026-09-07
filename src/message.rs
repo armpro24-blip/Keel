@@ -18,6 +18,23 @@ pub enum Role {
     Assistant,
 }
 
+/// Where a tool result came from, which decides how it may be trusted.
+///
+/// PIRA's safety rule: instructions are trusted only when they come from the
+/// user or from an `AGENTS.md`-designated policy path; everything else,
+/// including tool output, is task data. Carrying the origin with the block
+/// gives the adapter, the context manager, and the session log one source of
+/// truth for that distinction (PLAN.md §5.5, T6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Provenance {
+    /// Ordinary tool output: task data, never instructions.
+    Observation,
+    /// Exact text of a PIRA policy source. `source` is the path as PIRA's
+    /// routing table names it, for example `~/agent/modules/CODING_STYLE.md`,
+    /// so the model can apply PIRA's own trust rule to it.
+    PiraPolicy { source: String },
+}
+
 /// One unit of content inside a message.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Block {
@@ -34,6 +51,7 @@ pub enum Block {
         call_id: String,
         output: String,
         is_error: bool,
+        provenance: Provenance,
     },
 }
 

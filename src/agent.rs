@@ -99,6 +99,7 @@ impl AgentLoop {
                     call_id: call.id,
                     output: result.output,
                     is_error: result.is_error,
+                    provenance: result.provenance,
                 });
             }
             transcript.push(Message {

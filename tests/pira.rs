@@ -5,69 +5,13 @@ mod common;
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
 
-use common::TempDir;
+use common::{SyntheticPira, AGENTS_TEMPLATE};
 
 use keel::pira::{
     compare, contract_failures, parse_routing_table, sha256_hex, Compatibility, Fingerprint, Lock,
-    PiraInstall, PolicySource, VERIFICATION_TOKEN,
+    PolicySource, VERIFICATION_TOKEN,
 };
-
-struct SyntheticPira {
-    _dir: TempDir,
-    root: PathBuf,
-}
-
-const AGENTS_TEMPLATE: &str = "# PIRA AGENT INSTRUCTIONS
-
-## Verification Token
-TOKEN
-
-## Module Loading and Routing
-Read on-demand PIRA instruction files exactly.
-
-Load on demand (explicit or inferred):
-- `user_profile`: `~/agent/USER.md` when user background matters.
-- `coding`: `~/agent/modules/CODING_STYLE.md` for implementation.
-- not a source line
-- `writing`: `~/agent/modules/SCIENTIFIC_WRITING.md` for prose.
-
-### Constraints
-- Edit instruction files only on explicit user request.
-
-## Tool Selection
-- `pira_ctx`: `~/agent/not/a/policy/source` this line is outside the section.
-";
-
-impl SyntheticPira {
-    fn new(label: &str) -> SyntheticPira {
-        let dir = TempDir::new(&format!("pira-{label}"));
-        let root = dir.path.clone();
-        fs::create_dir_all(root.join("modules")).unwrap();
-        fs::write(
-            root.join("AGENTS.md"),
-            AGENTS_TEMPLATE.replace("TOKEN", VERIFICATION_TOKEN),
-        )
-        .unwrap();
-        fs::write(root.join("USER.md"), "# USER\n- fill manually\n").unwrap();
-        fs::write(
-            root.join("modules").join("CODING_STYLE.md"),
-            "# CODING_STYLE\r\nexact bytes with CRLF\r\n",
-        )
-        .unwrap();
-        fs::write(
-            root.join("modules").join("SCIENTIFIC_WRITING.md"),
-            "# SCIENTIFIC_WRITING\n",
-        )
-        .unwrap();
-        SyntheticPira { _dir: dir, root }
-    }
-
-    fn install(&self) -> PiraInstall {
-        PiraInstall::at(&self.root)
-    }
-}
 
 fn tools_all_present() -> BTreeMap<String, Option<String>> {
     [

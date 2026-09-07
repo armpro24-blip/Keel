@@ -62,22 +62,38 @@ AgentLoop ── Model (trait) ── FakeModel | OneRealModelAdapter
 
 ## Status
 
-M1: the agent loop (M0) plus one real model adapter, OpenAI Chat Completions
-with function calling, behind a stdin/stdout REPL. The only tool is `echo`,
-kept to observe real tool-use behavior. No PIRA, shell, permissions,
-persistence, async, Skills, MCP, or TUI yet. Each of those arrives only when an
-observed need requires it (see `PLAN.md` §7).
+M2 in progress. Done so far:
+
+- M0: the agent loop, a scripted `FakeModel`, a `Tool` trait with one
+  deterministic tool, deterministic tests.
+- M1: OpenAI Chat Completions adapter (synchronous HTTP, tested against a
+  loopback server) behind a stdin/stdout REPL; validated against a local vLLM
+  deployment (`docs/evidence/`).
+- M2 A: workspace identity with `pira_ctx`'s rule; `keel pira check [--lock]`
+  reads and validates the PIRA installation at `~/agent` and records the
+  verified state in `~/.keel/pira.lock` (VERIFIED / UNVERIFIED-COMPATIBLE /
+  INCOMPATIBLE).
+- M2 B: the REPL runs PIRA: `AGENTS.md` verbatim as the system instruction
+  plus a short host block; `read_pira_policy` loads declared modules exactly;
+  tool results carry their provenance; one session id per process exported
+  as `PIRA_CTX_THREAD_ID`.
+
+Not yet: the shell tool through `pira_ctx`, permissions, the session log,
+compaction. Each arrives only when an observed need requires it
+(`PLAN.md` §7).
 
 ```text
 cargo test
-OPENAI_API_KEY=... cargo run -- --model <model-name>
+keel pira check --lock
+OPENAI_API_KEY=... cargo run -- --model <model-name> [--trace]
 ```
 
 `OPENAI_BASE_URL` overrides the endpoint for OpenAI-compatible servers,
 including local ones (for example `http://localhost:11434/v1` for Ollama or a
 vLLM / llama.cpp server). Such servers usually ignore the key, but
 `OPENAI_API_KEY` must still be set to some placeholder. The model name has no
-default; pass `--model` or set `OPENAI_MODEL`.
+default; pass `--model` or set `OPENAI_MODEL`. The REPL requires a readable,
+compatible PIRA installation at `~/agent`.
 
 ## License
 

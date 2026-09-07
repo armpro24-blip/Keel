@@ -23,7 +23,7 @@ use sha2::{Digest, Sha256};
 pub const VERIFICATION_TOKEN: &str = "31415926535897932384626433832795";
 
 /// The prefix PIRA `master` uses for every policy path in `AGENTS.md`.
-const POLICY_PATH_PREFIX: &str = "~/agent/";
+pub const POLICY_PATH_PREFIX: &str = "~/agent/";
 
 /// Tools that PIRA's own `AGENTS.md` requires. `pira_svg_check` is part of
 /// the PIRA tool set but not referenced by the policy text, so it is probed
@@ -468,4 +468,39 @@ pub fn compare(
 /// Where Keel keeps its own state; the lock lives here (PLAN.md §4.2).
 pub fn default_lock_path() -> Result<PathBuf, PiraError> {
     Ok(home_dir()?.join(".keel").join("pira.lock"))
+}
+
+/// Everything `keel pira check` reports and the REPL consults at start-up.
+pub struct Inspection {
+    pub policy: Policy,
+    pub fingerprint: Fingerprint,
+    pub compatibility: Compatibility,
+}
+
+/// Read, probe, hash, and compare in one pass. An `Err` means the
+/// installation could not even be read or the lock is corrupt; callers
+/// treat that as INCOMPATIBLE.
+pub fn inspect(install: &PiraInstall, lock_path: &Path) -> Result<Inspection, PiraError> {
+    let policy = install.load_policy()?;
+    let file_failures = install.check_files(&policy);
+    let tools = probe_tools();
+    let failures = contract_failures(&file_failures, &tools);
+    // Hashing needs every declared file; without them the contract already failed.
+    let files = if file_failures.is_empty() {
+        install.file_hashes(&policy)?
+    } else {
+        BTreeMap::new()
+    };
+    let fingerprint = Fingerprint {
+        files,
+        tools,
+        source_commit: install.source_commit(),
+    };
+    let lock = Lock::read(lock_path)?;
+    let compatibility = compare(lock.as_ref(), &fingerprint, &failures);
+    Ok(Inspection {
+        policy,
+        fingerprint,
+        compatibility,
+    })
 }

@@ -204,7 +204,7 @@ M2 分四片，前一片的验收是后一片的前提。A 片不依赖模型行
 | 片 | 内容 | 验收点 |
 |---|---|---|
 | **A. 地基（不依赖模型）** | `WorkspaceManager`：身份规则与 `pira_ctx` 相同（最近含 `.git` 的祖先，否则 cwd）；路径分类 Inside / Temp / Outside。`PiraInstall`：只读 `~/agent`，读取 `AGENTS.md`，校验 token，解析路由表得到可信策略源集合，校验文件存在，探测四个工具版本。`pira.lock`（`~/.keel/pira.lock`，JSON）与三态判定；`keel pira check [--lock]`。loader 的纯 API：按名读取策略源的精确字节 | 全部有确定性测试（合成 PIRA 目录）；本机 `keel pira check` 先报 UNVERIFIED-COMPATIBLE（无锁），`--lock` 后报 VERIFIED；人为改一个模块文件后报漂移；删掉 token 后报 INCOMPATIBLE |
-| **B. 身份** | `ContextManager`：系统指令 = `AGENTS.md` 逐字节 + host block（§4.3-1）；`load_pira_policy` 工具（只接受路由表声明的名字与 `user_profile`，精确字节，不经 `pira_ctx`，结果标记为可信策略激活）；会话 ID 与 `PIRA_CTX_THREAD_ID` | 用 `FakeModel` 断言系统指令哈希等于文件哈希且含 host block；loader 对未声明名字返回错误观察；loader 从不启动子进程（测试断言） |
+| **B. 身份**（已实现，待 D 片实证） | `ContextManager`：系统指令 = `AGENTS.md` 逐字节 + host block（§4.3-1）；`read_pira_policy` 工具（只接受路由表声明的名字，精确字节，不经 `pira_ctx`）；`Provenance` 字段随 `ToolResult` 携带来源（`Observation` / `PiraPolicy{source}`，用户决策 a），适配器把策略结果包成带路径的 `<pira_policy>` 框架；会话 ID 与 `PIRA_CTX_THREAD_ID`；REPL 启动前先做兼容性判定，INCOMPATIBLE 拒绝启动 | 已达成：系统指令中 `AGENTS.md` 段哈希等于文件哈希且以 host block 结尾；loader 对未声明名字与穿越名字返回错误观察；loader 实现只含文件读取，无进程调用；策略来源框架有 wire 测试 |
 | **C. 行动** | `shell` 工具：`argv` + `intent` + 可选 `mode`/`interest`/`workdir`/`timeout`；命令构造为纯函数 `wrap_command`（内部工具按 basename 判定，忽略路径与 `.exe`）；`PermissionEngine` 的 `ask` 模式（策略加载免审批）；REPL 接线 | `wrap_command` 的不变量测试（§9-3）；子进程环境含 `PIRA_CTX_THREAD_ID`（§9-4）；`ask` 模式下每个 shell 调用都经确认且策略加载不询问（§9-7） |
 | **D. 实证** | 实验室冒烟：以 PIRA 身份回答（token 探针）、按需加载一个模块、执行一条 shell 命令并在 `pira_ctx history` 中可见 | 证据文档 `docs/evidence/M2_SMOKE_<date>.md` |
 

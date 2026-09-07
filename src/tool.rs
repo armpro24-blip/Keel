@@ -1,34 +1,50 @@
 //! The tool boundary: a named capability the model may invoke.
 //!
-//! In M0 there is one deterministic tool and no permission layer. Later
-//! milestones put the PermissionEngine between the loop and `execute`
-//! (PLAN.md §5.6); the trait itself does not change for that.
+//! There is no permission layer here yet. Later milestones put the
+//! PermissionEngine between the loop and `execute` (PLAN.md §5.6); the trait
+//! itself does not change for that.
 
 use std::fmt;
 
 use serde_json::{json, Value};
 
-use crate::message::ToolSpec;
+use crate::message::{Provenance, ToolSpec};
 
 /// What a tool observed. Errors are ordinary observations for the model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolResult {
     pub output: String,
     pub is_error: bool,
+    pub provenance: Provenance,
 }
 
 impl ToolResult {
+    /// Ordinary output: task data.
     pub fn ok(output: impl Into<String>) -> Self {
         ToolResult {
             output: output.into(),
             is_error: false,
+            provenance: Provenance::Observation,
         }
     }
 
+    /// A failure the model should see and may recover from.
     pub fn error(output: impl Into<String>) -> Self {
         ToolResult {
             output: output.into(),
             is_error: true,
+            provenance: Provenance::Observation,
+        }
+    }
+
+    /// Exact text of a PIRA policy source; only the PIRA loader produces this.
+    pub fn policy(output: impl Into<String>, source: impl Into<String>) -> Self {
+        ToolResult {
+            output: output.into(),
+            is_error: false,
+            provenance: Provenance::PiraPolicy {
+                source: source.into(),
+            },
         }
     }
 }
@@ -39,8 +55,7 @@ pub trait Tool {
     /// Execute one call.
     ///
     /// Tool failures are reported through `ToolResult::is_error` so the model
-    /// can see and react to them. A Rust error would mean a harness fault, and
-    /// M0 has none to report.
+    /// can see and react to them. A Rust error would mean a harness fault.
     fn execute(&mut self, input: &Value) -> ToolResult;
 }
 
