@@ -202,10 +202,12 @@ pub struct OpenAiChatModel {
     base_url: String,
     api_key: String,
     model: String,
-    /// When set, every request body sent and every response body received is
-    /// appended verbatim. This is the instruction-path audit's first step
-    /// (PLAN.md §2 "Own the instruction path"): what the model was actually
-    /// sent, byte for byte, not what Keel meant to send.
+    /// Diagnostic wire capture (PLAN.md §5.9): when set, every request body
+    /// sent and every response body received is appended verbatim, so an
+    /// instruction-path audit can see what the model was actually sent, byte
+    /// for byte, not what Keel meant to send. It holds the complete
+    /// model-visible context and is therefore opt-in and local only; it is
+    /// not a second session log.
     wire_log: Option<SessionLog>,
 }
 
@@ -226,7 +228,8 @@ impl OpenAiChatModel {
         }
     }
 
-    /// Record exact request and response bodies to `log`.
+    /// Enable the diagnostic wire capture into `log`. See the `wire_log`
+    /// field for what this records and why it stays opt-in.
     pub fn record_wire_to(&mut self, log: SessionLog) {
         self.wire_log = Some(log);
     }

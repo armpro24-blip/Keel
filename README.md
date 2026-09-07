@@ -85,9 +85,11 @@ M2 in progress. Done so far:
 - M3: every session is recorded as append-only JSONL under
   `~/.keel/sessions/<workspace>/<session>.jsonl` (messages, gate decisions,
   run outcomes, in the order they happened); `keel log show FILE` renders it
-  for inspection without re-running anything. `--record-wire` additionally
-  records every exact request and response body exchanged with the model,
-  the first step of an instruction-path audit (`docs/AUDIT_T15.md`).
+  for inspection without re-running anything. Separately, `--record-wire` is
+  an opt-in diagnostic capture for instruction-path audits
+  (`docs/AUDIT_T15.md`): it writes the complete model-visible context and
+  every response body. It is high-sensitivity by nature: local only, never
+  on by default, inspect and redact before sharing, never commit.
 
 Keel owns the instruction-delivery path. When the model does not follow a
 PIRA instruction, that is investigated as a system problem first; it is

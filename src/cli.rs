@@ -21,8 +21,10 @@ pira:  `pira check` validates the PIRA installation at ~/agent against
        ~/.keel/pira.lock; `--lock` records the current state as verified
 log:   every session is recorded under ~/.keel/sessions/<workspace>/<session>.jsonl;
        `log show FILE` renders one such file for inspection (nothing is re-run)
-wire:  --record-wire also records every exact request and response body exchanged
-       with the model in <session>.wire.jsonl, for instruction-path audits";
+wire:  --record-wire is a diagnostic capture for instruction-path audits, not a
+       log: it writes the complete model-visible context and every response
+       body to <session>.wire.jsonl. Opt-in, local only; inspect and redact
+       before sharing, never commit";
 
 /// What the command line asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
