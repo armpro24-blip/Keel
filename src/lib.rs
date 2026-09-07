@@ -24,13 +24,15 @@
 //! - [`session`]: one id per process, exported as `PIRA_CTX_THREAD_ID`.
 //! - [`shell`]: the `shell` tool; every command through `pira_ctx` unless it is a PIRA tool.
 //! - [`permission`]: the PermissionEngine, `ask` or `full`, outside-workspace always asks.
+//! - [`log`]: the SessionLog, append-only JSONL provenance; reconstruct, never replay.
 //!
-//! Not yet present: the session log and compaction.
+//! Not yet present: compaction.
 
 pub mod agent;
 pub mod cli;
 pub mod context;
 pub mod loader;
+pub mod log;
 pub mod message;
 pub mod model;
 pub mod openai;

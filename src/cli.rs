@@ -6,6 +6,7 @@
 
 pub const USAGE: &str = "usage: keel --model NAME [--trace] [--full]   (or set OPENAI_MODEL)
        keel pira check [--lock]
+       keel log show FILE
        keel --help | --version
 env:   OPENAI_API_KEY   required for the REPL
        OPENAI_BASE_URL  optional, default https://api.openai.com/v1
@@ -16,7 +17,9 @@ full:  --full skips ordinary host approval and relies on the model to follow
        sandbox. Use the default (ask) when model compliance has not been
        demonstrated. A working directory outside the workspace always asks.
 pira:  `pira check` validates the PIRA installation at ~/agent against
-       ~/.keel/pira.lock; `--lock` records the current state as verified";
+       ~/.keel/pira.lock; `--lock` records the current state as verified
+log:   every session is recorded under ~/.keel/sessions/<workspace>/<session>.jsonl;
+       `log show FILE` renders one such file for inspection (nothing is re-run)";
 
 /// What the command line asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,6 +32,9 @@ pub enum Cli {
     PiraCheck {
         lock: bool,
     },
+    LogShow {
+        path: String,
+    },
     Help,
     Version,
 }
@@ -36,8 +42,10 @@ pub enum Cli {
 /// Parse `args` (without the program name). `model_from_env` is the value of
 /// `OPENAI_MODEL`, used when `--model` is absent.
 pub fn parse_args(args: &[String], model_from_env: Option<String>) -> Result<Cli, String> {
-    if args.first().map(String::as_str) == Some("pira") {
-        return parse_pira_args(&args[1..]);
+    match args.first().map(String::as_str) {
+        Some("pira") => return parse_pira_args(&args[1..]),
+        Some("log") => return parse_log_args(&args[1..]),
+        _ => {}
     }
     let mut model = None;
     let mut trace = false;
@@ -78,5 +86,12 @@ fn parse_pira_args(args: &[String]) -> Result<Cli, String> {
             Ok(Cli::PiraCheck { lock: true })
         }
         _ => Err("expected: keel pira check [--lock]".to_string()),
+    }
+}
+
+fn parse_log_args(args: &[String]) -> Result<Cli, String> {
+    match args {
+        [command, path] if command == "show" => Ok(Cli::LogShow { path: path.clone() }),
+        _ => Err("expected: keel log show FILE".to_string()),
     }
 }

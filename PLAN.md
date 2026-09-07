@@ -192,7 +192,7 @@ shell/action execution      → approval according to current mode
 | **M0 — 拥有 loop** | Rust crate（lib + bin，同一 package）；中立消息类型；`Model` trait + `FakeModel`（脚本化回复序列）；`Tool` trait + 一个确定性假工具；`AgentLoop`；`max_turns`；确定性 tests | PIRA、真实模型、HTTP、shell、权限、持久化、async、Skills、MCP、TUI | 测试证明 loop 正确终止、按序分发、把 observation 传回模型 | `User input → FakeModel → ToolCall → ToolResult → FakeModel → Final answer` 在测试中通过 |
 | **M1 — 真实模型**（已完成，gate 已关闭） | `OpenAiChatModel`（OpenAI Chat Completions；同步 HTTP，§6）；stdin/stdout REPL；凭据取自环境变量；假工具保留 | shell、PIRA、权限、async | 需要观察真实模型的 tool-use 行为才能继续设计 | 已达成：vLLM 0.27.1 + mistral-small-4-119b 完成单次与单轮三次工具往返，转录跨输入连续；证据见 `docs/evidence/M1_SMOKE_2026-09-07.md` |
 | **M2 — PIRA 上岗** | ContextManager：`AGENTS.md` 逐字节 + host block；`shell` 工具（§5.4）；PIRA policy loader（§5.5，免审批）；`PIRA_CTX_THREAD_ID`；`ask` 模式（动作类调用询问）；WorkspaceManager 身份 + 边界检查；`keel pira check` + `pira.lock` 三态 | `full` 模式、压缩、日志 | 模型需要真正行动 | 验证 token 出现在系统指令；`pira_ctx history` 能看到 Keel 发起的命令 |
-| **M3 — 强制与证据** | `full` 模式；SessionLog JSONL；越界确认 | 压缩 | 实际使用中 `ask` 过于频繁（观察到） | 越界写入被拦下；可从日志重建并检视一次会话，不重放执行 |
+| **M3 — 强制与证据**（已实现） | `full` 模式与越界确认（已在 C 片提前落地）；SessionLog：每会话一个追加式 JSONL（`~/.keel/sessions/<工作区哈希>/<会话>.jsonl`），记录 session_start（host block、模式、PIRA commit 与兼容状态）、每条消息、每个闸门决策（含被拒的）、每次 run 结束、session_end；日志打不开则会话不启动，中途写失败以警告可见；`keel log show FILE` 只渲染不重放；日志不注入模型 | 压缩 | 实际使用中 `ask` 过于频繁（观察到） | 越界写入被拦下（M2 C 实证）；`keel log show` 可重建一次会话而不重放执行 |
 | **M4 — 显式压缩** | `/compact` + 压缩通知 + recap 路径；最简压缩算法 | 自动压缩 | 观察到上下文溢出 | 压缩后模型用 `pira_ctx recap` 续接 |
 | **未排期** | 文件编辑工具（若 shell 编辑被观察到不可靠）、MCP 客户端、Skills、subagents、项目级 `AGENTS.md` 发现、流式、resume、`pira_dir` 重定位、Cargo workspace、TUI | | 各自需要观察到的问题 | |
 

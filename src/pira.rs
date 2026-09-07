@@ -42,7 +42,8 @@ impl fmt::Display for PiraError {
 
 impl std::error::Error for PiraError {}
 
-fn home_dir() -> Result<PathBuf, PiraError> {
+/// The user's home directory, the anchor for `~/agent` and `~/.keel`.
+pub fn home_dir() -> Result<PathBuf, PiraError> {
     let variable = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
     std::env::var_os(variable)
         .map(PathBuf::from)

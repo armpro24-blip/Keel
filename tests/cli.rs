@@ -53,6 +53,19 @@ fn help_and_version_short_circuit_without_a_model() {
 }
 
 #[test]
+fn log_show_subcommand() {
+    assert_eq!(
+        parse_args(&args(&["log", "show", "s.jsonl"]), None),
+        Ok(Cli::LogShow {
+            path: "s.jsonl".to_string()
+        })
+    );
+    assert!(parse_args(&args(&["log"]), None).is_err());
+    assert!(parse_args(&args(&["log", "show"]), None).is_err());
+    assert!(parse_args(&args(&["log", "tail", "s.jsonl"]), None).is_err());
+}
+
+#[test]
 fn pira_check_subcommand() {
     assert_eq!(
         parse_args(&args(&["pira", "check"]), None),

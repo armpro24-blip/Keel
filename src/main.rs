@@ -12,7 +12,10 @@ use keel::agent::AgentLoop;
 use keel::cli::{parse_args, Cli, USAGE};
 use keel::context::{ContextManager, HostInfo};
 use keel::loader::{self, PolicyLoader};
-use keel::message::{Block, Message, Provenance, Role};
+use keel::log::{
+    default_sessions_dir, message_to_json, read_events, render_event, LoggedGate, SessionLog,
+};
+use keel::message::Message;
 use keel::openai::OpenAiChatModel;
 use keel::permission::{ApprovalMode, Approver, PermissionEngine};
 use keel::pira::{
@@ -78,35 +81,6 @@ impl Approver for StdinApprover {
         let answer = read_line().unwrap_or_default();
         matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
     }
-}
-
-/// One line per block, prefixed with the role, for `--trace`.
-fn describe(message: &Message) -> String {
-    let role = match message.role {
-        Role::User => "user",
-        Role::Assistant => "assistant",
-    };
-    let lines: Vec<String> = message
-        .blocks
-        .iter()
-        .map(|block| match block {
-            Block::Text(text) => format!("  text: {text}"),
-            Block::ToolCall { id, name, input } => format!("  tool_call {id}: {name}({input})"),
-            Block::ToolResult {
-                call_id,
-                output,
-                is_error,
-                provenance,
-            } => {
-                let origin = match provenance {
-                    Provenance::Observation => String::new(),
-                    Provenance::PiraPolicy { source } => format!(", policy={source}"),
-                };
-                format!("  tool_result {call_id} (error={is_error}{origin}): {output}")
-            }
-        })
-        .collect();
-    format!("[{role}]\n{}", lines.join("\n"))
 }
 
 /// Print the INCOMPATIBLE state with its reasons and return the exit code.
@@ -195,6 +169,22 @@ fn record(fingerprint: &Fingerprint, lock_path: &Path) -> i32 {
     }
 }
 
+/// `keel log show FILE`: render a session log for inspection. Nothing is re-run.
+fn log_show(path: &str) -> i32 {
+    match read_events(Path::new(path)) {
+        Ok(events) => {
+            for event in &events {
+                say(render_event(event));
+            }
+            0
+        }
+        Err(error) => {
+            eprintln!("error: {error}");
+            1
+        }
+    }
+}
+
 /// The REPL. PIRA must be readable and compatible before the model is asked
 /// anything; drift is a warning, INCOMPATIBLE refuses to start (PLAN.md §4.2).
 fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
@@ -264,6 +254,28 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
         vec![loader::TOOL_NAME.to_string()],
         Box::new(StdinApprover),
     );
+
+    // Evidence is part of the contract: a session that cannot be recorded
+    // does not start (PLAN.md §5.9).
+    let sessions_dir = default_sessions_dir(workspace.root()).unwrap_or_else(|error| {
+        eprintln!("error: {error}");
+        std::process::exit(1);
+    });
+    let mut log = SessionLog::open(&sessions_dir, session.as_str()).unwrap_or_else(|error| {
+        eprintln!("error: {error}");
+        std::process::exit(1);
+    });
+    log.record(serde_json::json!({
+        "event": "session_start",
+        "keel": env!("CARGO_PKG_VERSION"),
+        "session": session.as_str(),
+        "workspace_root": workspace.root().display().to_string(),
+        "approval_mode": mode.describe(),
+        "pira_commit": inspection.fingerprint.source_commit,
+        "pira_compatibility": format!("{:?}", inspection.compatibility),
+        "host_block": context.host_block(),
+    }));
+    eprintln!("[log] {}", log.path().display());
     let agent = AgentLoop {
         system: context.system_instruction(),
         max_turns: MAX_TURNS,
@@ -289,16 +301,44 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode) {
         }
 
         let before = transcript.len();
-        let outcome = agent.run(&mut model, &mut tools, &mut gate, &mut transcript, input);
-        if trace {
-            for message in &transcript[before..] {
-                eprintln!("{}", describe(message));
+        let outcome = {
+            let mut logged_gate = LoggedGate::new(&mut gate, &mut log);
+            agent.run(
+                &mut model,
+                &mut tools,
+                &mut logged_gate,
+                &mut transcript,
+                input,
+            )
+        };
+        for message in &transcript[before..] {
+            let event = message_to_json(message);
+            if trace {
+                eprintln!("{}", render_event(&event));
             }
+            log.record(event);
+        }
+        match &outcome {
+            Ok(outcome) => log.record(serde_json::json!({
+                "event": "run_end",
+                "turns": outcome.turns,
+            })),
+            Err(error) => log.record(serde_json::json!({
+                "event": "run_end",
+                "error": error.to_string(),
+            })),
+        }
+        if let Some(failure) = log.take_failure() {
+            eprintln!("warning: session log: {failure}");
         }
         match outcome {
             Ok(outcome) => say(&outcome.final_text),
             Err(error) => eprintln!("error: {error}"),
         }
+    }
+    log.record(serde_json::json!({ "event": "session_end" }));
+    if let Some(failure) = log.take_failure() {
+        eprintln!("warning: session log: {failure}");
     }
 }
 
@@ -314,6 +354,7 @@ fn main() {
             repl(model, trace, mode)
         }
         Ok(Cli::PiraCheck { lock }) => std::process::exit(pira_check(lock)),
+        Ok(Cli::LogShow { path }) => std::process::exit(log_show(&path)),
         Ok(Cli::Help) => say(USAGE),
         Ok(Cli::Version) => say(format!("keel {}", env!("CARGO_PKG_VERSION"))),
         Err(message) => usage_error(&message),
