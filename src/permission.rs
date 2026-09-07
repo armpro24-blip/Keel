@@ -32,7 +32,7 @@ impl ApprovalMode {
                 "ask (the user confirms each action before it runs; loading PIRA policy needs no confirmation)"
             }
             ApprovalMode::Full => {
-                "full (no approval prompts and no sandbox; PIRA's full-permission rules apply)"
+                "full (no ordinary host approval and no sandbox; semantic safety relies on the model following PIRA's full-permission rules, which Keel does not enforce)"
             }
         }
     }
