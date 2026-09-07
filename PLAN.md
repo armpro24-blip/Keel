@@ -36,8 +36,9 @@ Keel 不附着于任何现有 harness，也不吸收 PIRA。PIRA 保持为独立
 | 工具分发与执行 | Keel | |
 | **host approval enforcement**（是否执行某个动作） | Keel | 按当前审批模式询问或放行 |
 | **workspace boundary enforcement** | Keel | PIRA 定义规则（工作区 = 默认范围，temp 为唯一常设例外） |
-| **semantic safety review**（是否改变状态；action/scope/risk/rollback 的判断与内容） | PIRA / model | Keel 不判断 `cargo test` 或 `python script.py` 是否破坏性 |
-| **pre-execution safety-review protocol**（状态变更动作执行前必须存在评审工件，Keel 可见地输出它，然后才执行） | Keel（T15 综合结论后新增，待握手实验验证后落地） | 既然模型说这是状态变更动作，评审这一步就不能被跳过；这是执行顺序不变量，不是语义判断 |
+| **effect classification**（一条命令是否改变 file/repository/tool/user/system 状态） | PIRA / model | Keel 不判断 `cargo test` 或 `python script.py` 是否破坏性；模型把状态变更误报为 read_only 时 Keel 不纠正，这是有意保留的边界，声明可审计 |
+| **review semantic quality**（action/scope/risk/rollback 的内容是否充分） | PIRA / model | Keel 只校验"评审工件已提供"，不校验其语义；`"Looks fine."` 会通过 |
+| **review presence + execution ordering**（声明为状态变更的动作执行前必须存在评审工件，Keel 可见输出后才执行） | Keel（T15 综合结论后新增，待握手实验验证后落地） | 执行顺序不变量，不是语义判断。一句话定义：**The model owns the semantic classification and review; Keel owns the integrity and ordering of the declared pre-execution handshake.** 输出形式为 `Safety: <model-provided review>`，日志标注 `source = model`、`validated = presence_only`；组件命名按其所 gate 的东西（`PreExecutionHandshake` / `SafetyReviewGate`），不叫 `SafetyEnforcer`；条件校验由运行时确定性完成，不依赖 JSON Schema 的 if/then |
 | PIRA 策略源的加载机制 | Keel（专用 loader） | 只加载 PIRA 安装所声明的可信源；§5.5 |
 | 哪些文件是可信策略源 | PIRA | 由 `AGENTS.md` 路由表与 `USER.md` 声明 |
 | 上下文装配与压缩时机 | Keel | 压缩后的活动恢复内容归 `pira_ctx recap` |
