@@ -62,7 +62,8 @@ AgentLoop ── Model (trait) ── FakeModel | OneRealModelAdapter
 
 ## Status
 
-M2 in progress. Done so far:
+M0–M3 done; T15 closed. Current phase: long-horizon dogfooding
+(`docs/dogfood/L1/`), no next mechanism selected. Done so far:
 
 - M0: the agent loop, a scripted `FakeModel`, a `Tool` trait with one
   deterministic tool, deterministic tests.
