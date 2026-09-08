@@ -1,12 +1,25 @@
 # Optional stdin on the shell tool: feasibility gates
 
-Status: **stdin candidate stopped (2026-09-08).** Gate A passed (local and
-lab). Gate B: structure 10/10; preregistered line-containment completeness
-1/10 (stop-and-report, preserved); reviewer-authorized byte-exact repair
-rescoring on the same frozen responses **4/10**, below the ≤6/10 stop
-threshold. Every failure was in the model's own writer-program escaping
-layer, not in the channel (`docs/evidence/STDIN_GATE_B_2026-09-08.md`).
-Nothing in Keel is changed; the design section below was not entered. The candidate mechanism under evaluation, and
+Status: **stopped for the L1 file-editing problem (review decision,
+2026-09-08).** Exact conclusion, preserved:
+
+- Gate A: stdin transport through `pira_ctx` works.
+- Gate B structural transport: 10/10.
+- Repaired byte-exact writer result: 4/10 (preregistered line-containment
+  result 1/10 and its stop-and-report action also preserved).
+- Failures arose entirely in the model-authored writer/escaping layer.
+- Therefore optional shell stdin is not implemented from this evidence, and
+  L1-R1 is not run with stdin.
+
+This does not state that stdin is intrinsically unreliable. The rejected
+mechanism is specifically: **a model-authored writer program delivered via
+stdin as the solution to reliable file editing.** A future independent
+workload may justify generic process stdin separately.
+
+Next candidate: direct structured file writing, gated by Gate C
+(`docs/WRITE_FILE_GATE.md`). Nothing in Keel is changed; the design section
+below was not entered and is kept only as the record of what would have been
+reviewed. The candidate mechanism under evaluation, and
 the only one, is:
 
 > Add optional UTF-8 stdin to the existing shell invocation, preserving the
