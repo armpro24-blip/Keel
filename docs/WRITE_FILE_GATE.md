@@ -1,6 +1,11 @@
 # Direct structured file writing: Gate C
 
-Status: **Gate C prepared, not yet run (2026-09-08).** No Keel code changes.
+Status: **Gate C run 2026-09-08: `content_byte_exact` 6/10 → the write_file
+candidate is stopped under the pre-registered rule (≤6/10), no redesign.**
+Structure 10/10, path 10/10, no L1-style collapse 0/10; the four non-exact
+responses differ from the payload only by the final newline
+(`docs/evidence/WRITE_FILE_GATE_C_2026-09-08.md`). No Keel code changes; the
+design-review section below was not entered.
 
 ## Where this comes from
 
@@ -86,6 +91,21 @@ python docs/dogfood/write_file/gate_c.py --base-url http://192.168.3.103:8000/v1
 Report `scores.txt` in full (it includes each row's `finish`, `usage`,
 `reasoning_chars`, `content_text`, and for any non-exact row the 300-char
 `arguments_prefix` and the short diff). Keep the raw responses.
+
+### Result (2026-09-08)
+
+```text
+valid_write_file_call 10/10   path_exact 10/10   content_is_string 10/10
+content_byte_exact 6/10 (gate metric)
+trailing_newline_only_diff 4/10 (diagnostic)   looks_like_l1_collapse 0/10
+```
+
+Under `≤6/10 → stop the write_file candidate; do not redesign after seeing
+the failures`, the candidate is stopped. Fact recorded for the reviewer: the
+four failures are each a single missing final newline; every line of the
+body, including quotes, backslashes, braces and the regex, was carried
+intact in 10/10; the body was presented in a fenced block and the task text
+did not say whether the newline before the closing fence belongs to it.
 
 ## If Gate C passes: what the design review must resolve
 
