@@ -138,6 +138,60 @@ classified observations: `docs/evidence/L1_2026-09-07.md`. The corrections
 above to rule 4, the history limit, and `session_stats.py` were made after
 that run; the task text, seed, and acceptance tests are unchanged.
 
+## L1-R1: regression rerun with `edit_file`
+
+Purpose: the same frozen workload with exactly one intentional runtime
+difference, the `edit_file` tool registered (`docs/DESIGN_EDIT_FILE.md`).
+Everything else is held fixed: seed commit `f5b688f`, task text, hidden
+acceptance suite, Qwen3.6 serving configuration as closely as practical,
+`ask` mode, PIRA baseline, operator rules above (with the post-L1
+corrections). No instruction points the model at `edit_file` beyond the
+tool's own description. T19 is not implemented.
+
+Procedure differences from L1:
+
+1. Keel at the frozen implementation commit (`git rev-parse HEAD` after the
+   pull; report it) built with `cargo build -q`; `cargo test` count.
+2. Create a fresh repository: `bash <Keel>/docs/dogfood/L1/init_l1.sh ~/Desktop/tally-l1-r1`
+   (seed commit must again be `f5b688f`).
+3. Run from inside that repository exactly as in step 3 above (`--trace
+   --record-wire`, `ask` mode). If a driver program is used instead of a
+   terminal, state so, and make sure it decodes the whole output as UTF-8
+   before matching prompts (the L1 driver's byte-offset defect).
+4. Operator rules and the `Continue` budget are unchanged.
+5. Afterwards run the same step-5 commands, plus:
+
+   ```bash
+   grep -c '"tool":"edit_file"' "<the [log] path>"
+   grep -c '"tool":"shell"' "<the [log] path>"
+   ```
+
+Record, in addition to the L1 list: acceptance 0–7; total model calls and
+tool calls; calls by tool; malformed calls (and which tool); `edit_file`
+successes and errors, with each error's observation; how the model recovered
+from any zero-match or multi-match error; approval count and any `n`; any
+attempt to modify a file through `shell` and why, if visible; tests the
+model ran and their results; the final diff; human interventions; token
+growth per call; the SessionLog and `pira_ctx history` evidence.
+
+The comparison to be filled:
+
+```text
+                         L1 (argv-only shell)     L1-R1 (shell + edit_file)
+acceptance               0/7                      ?
+tool calls               42                       ?
+calls spent on editing   28 (0 successes)         ?
+malformed calls          8                        ?
+edit_file success/error  n/a                      ?
+approvals (y)            34                       ?
+tool errors              16                       ?
+model calls / wall clock 37 / 13.0 min            ?
+```
+
+If editing is still unreliable with `edit_file` available, stop and report;
+the report is `docs/evidence/L1R1_<date>.md` and work stops there for
+review.
+
 ## Review by observed failure
 
 The report is read against these categories, none of which is presumed:
