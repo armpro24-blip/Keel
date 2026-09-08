@@ -237,6 +237,26 @@ Procedure differences from L1-R1:
 
 Primary result: the unchanged hidden acceptance, 0–7 / 7.
 
+Evidence note (optional, observation only): if the running vLLM process
+already exposes metrics, preserve them for later review without changing
+anything. A plain GET is read-only:
+
+```bash
+curl -s http://192.168.3.103:8000/metrics > ~/Desktop/l1r2_metrics_before.txt   # immediately before the session
+curl -s http://192.168.3.103:8000/metrics > ~/Desktop/l1r2_metrics_after.txt    # immediately after /quit
+```
+
+Keep the server's log output too if it is accessible. vLLM's prefix-cache
+counters (`vllm:prefix_cache_queries_total`, `vllm:prefix_cache_hits_total`)
+and time-to-first-token histograms are cumulative since server start, so
+only a before/after pair is interpretable. Do not restart vLLM, change
+server flags, change Keel or the task, or add any model instruction for
+this. Cache data is not required for L1-R2 and missing values are not
+reconstructed; without a clean pre-run snapshot, report the metrics as
+cumulative or unavailable and leave them out of the comparison. The formal
+L1-R2 evidence remains acceptance, handshake and ordering, host approvals,
+tool behavior, seed-test preservation, tokens, timing, and the final diff.
+
 Full-mode invariants to verify for every executed state-changing call
 (`edit_file` by contract; `shell` when the model declared `state_changing`):
 non-empty model `safety_review` → `Safety: <review>` announced → allow →
