@@ -54,6 +54,7 @@ AgentLoop ── Model (trait) ── FakeModel | OneRealModelAdapter
   +-- ContextManager
   +-- ToolRegistry / Dispatch
   |     +-- shell (every invocation through pira_ctx, as PIRA master requires)
+  |     +-- edit_file (exact one-match replacement in an existing file, on bytes)
   |     +-- PIRA policy loader
   +-- PermissionEngine
   +-- WorkspaceManager
@@ -63,7 +64,9 @@ AgentLoop ── Model (trait) ── FakeModel | OneRealModelAdapter
 ## Status
 
 M0–M3 done; T15 closed. Current phase: long-horizon dogfooding
-(`docs/dogfood/L1/`), no next mechanism selected. Done so far:
+(`docs/dogfood/L1/`). L1 failed on file editing; three gated experiments led
+to `edit_file` (`docs/DESIGN_EDIT_FILE.md`), implemented and awaiting the
+L1-R1 regression. Done so far:
 
 - M0: the agent loop, a scripted `FakeModel`, a `Tool` trait with one
   deterministic tool, deterministic tests.
@@ -97,6 +100,13 @@ PIRA instruction, that is investigated as a system problem first; it is
 attributed to the model only after Keel has verified that the instruction
 reached the model with the correct content, precedence, runtime state, and
 tool semantics (`PLAN.md` §2).
+
+`edit_file` replaces exactly one occurrence of `old_text` with `new_text` in
+an existing file, on bytes: zero or several matches are errors the model
+sees, every byte outside the block is preserved, nothing is created, and the
+same approval and handshake rules apply as for `shell` (the effect is fixed
+by the tool's contract). Evidence: `docs/evidence/L1_*`,
+`docs/evidence/*GATE*`.
 
 Pre-execution handshake (T15): every `shell` call carries the model's own
 `effect` (`read_only` | `state_changing`) and, for state-changing commands

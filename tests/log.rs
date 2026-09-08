@@ -151,6 +151,42 @@ fn recorder_logs_messages_and_decisions_in_order_and_passes_decisions_through() 
 }
 
 #[test]
+fn recorder_marks_edit_file_effect_as_fixed_by_contract_and_keeps_the_full_input() {
+    let dir = TempDir::new("log-edit");
+    let mut log = SessionLog::open(&dir.path, "s").unwrap();
+    let input = json!({
+        "path": "tally/cli.py",
+        "old_text": "a\nb",
+        "new_text": "a\nc",
+        "safety_review": "Changes b to c."
+    });
+    let call = ToolCall {
+        id: "e1".to_string(),
+        name: "edit_file".to_string(),
+        input: input.clone(),
+    };
+    let mut allow = AllowAll;
+    Recorder::new(&mut allow, &mut log).decide(&call);
+
+    let events = read_events(log.path()).unwrap();
+    assert_eq!(
+        events[0]["input"], input,
+        "the full texts stay in the tool input"
+    );
+    assert_eq!(
+        events[0]["handshake"],
+        json!({
+            "effect": "state_changing",
+            "effect_source": "tool_contract",
+            "review_present": true,
+            "review_source": "model",
+            "review_validated": "presence_only"
+        })
+    );
+    assert!(render_event(&events[0]).contains("\"effect_source\":\"tool_contract\""));
+}
+
+#[test]
 fn a_malformed_line_is_an_error_not_skipped() {
     let dir = TempDir::new("log-malformed");
     let path = dir.path.join("bad.jsonl");

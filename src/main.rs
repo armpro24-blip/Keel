@@ -12,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use keel::agent::AgentLoop;
 use keel::cli::{parse_args, Cli, USAGE};
 use keel::context::{ContextManager, HostInfo};
+use keel::edit::EditFileTool;
 use keel::loader::{self, PolicyLoader};
 use keel::log::{
     default_sessions_dir, message_to_json, read_events, render_event, Recorder, SessionLog,
@@ -254,6 +255,9 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode, record_wire: bool) 
             workspace.root().to_path_buf(),
             session.as_str().to_string(),
         )))
+        .expect("tool names are unique");
+    tools
+        .register(Box::new(EditFileTool::new(workspace.root().to_path_buf())))
         .expect("tool names are unique");
     let mut gate = PermissionEngine::new(
         mode,

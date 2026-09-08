@@ -23,6 +23,7 @@
 //! - [`loader`]: the `read_pira_policy` tool, PIRA's module-loading exception.
 //! - [`session`]: one id per process, exported as `PIRA_CTX_THREAD_ID`.
 //! - [`shell`]: the `shell` tool; every command through `pira_ctx` unless it is a PIRA tool.
+//! - [`edit`]: the `edit_file` tool; exact one-match replacement in an existing file, on bytes.
 //! - [`permission`]: the PermissionEngine, `ask` or `full`, outside-workspace always asks.
 //! - [`log`]: the SessionLog, append-only JSONL provenance; reconstruct, never replay.
 //!
@@ -31,6 +32,7 @@
 pub mod agent;
 pub mod cli;
 pub mod context;
+pub mod edit;
 pub mod loader;
 pub mod log;
 pub mod message;

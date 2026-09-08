@@ -1,8 +1,11 @@
 # Design: `edit_file`, exact replacement of one block in an existing file
 
-Status: **for review, not approved, not implemented** (2026-09-08). Gate D
-passed 10/10 (`docs/evidence/EDIT_FILE_GATE_D_2026-09-08.md`). The
-alternatives stopped under their own gates are not revisited here.
+Status: **approved for implementation 2026-09-08 and implemented** (review
+decisions: `new_text` may be empty; no `intent` field; the tool wording says
+relative paths resolve against the workspace root and outside-workspace paths
+require host approval, matching the runtime). Gate D passed 10/10
+(`docs/evidence/EDIT_FILE_GATE_D_2026-09-08.md`). The alternatives stopped
+under their own gates are not revisited here. Regression L1-R1 pending.
 
 ## Problem this answers
 
@@ -52,13 +55,13 @@ Tool schema:
 ```json
 {
   "name": "edit_file",
-  "description": "Replace one exact block of text in an existing file inside the workspace. old_text must occur exactly once in the file, byte for byte; bytes outside that block, including line endings, are left untouched. Read the file first and copy old_text exactly. To create a file or run a program, use shell. In full-permission/no-approval mode a safety_review is required before the edit runs.",
+  "description": "Replace one exact block of text in an existing file. old_text must occur exactly once byte for byte; bytes outside that block, including line endings, are untouched. Read the file first and copy old_text exactly. Relative paths resolve against the workspace root; outside-workspace paths require host approval. To create a file or run a program, use shell. In full-permission/no-approval mode a safety_review is required before the edit runs.",
   "parameters": {
     "type": "object",
     "properties": {
-      "path": {"type": "string", "description": "File to edit, relative to the workspace root."},
+      "path": {"type": "string", "description": "Existing file to edit. Relative paths resolve against the workspace root; paths outside the workspace require host approval."},
       "old_text": {"type": "string", "description": "The exact existing text to replace; must occur exactly once."},
-      "new_text": {"type": "string", "description": "The exact replacement text."},
+      "new_text": {"type": "string", "description": "The exact replacement text; empty deletes the block."},
       "safety_review": {"type": "string", "description": "Required in full-permission/no-approval mode: the review PIRA's Full-Permission Behavior requires before this edit. Keel shows it as 'Safety: ...' before executing."}
     },
     "required": ["path", "old_text", "new_text"]

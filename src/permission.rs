@@ -17,6 +17,7 @@
 //! only standing exception.
 
 use crate::agent::{Decision, Hooks};
+use crate::edit::{self, EditFileRequest};
 use crate::message::ToolCall;
 use crate::shell::{self, Effect, ShellRequest};
 use crate::workspace::{PathScope, Workspace};
@@ -105,16 +106,61 @@ impl PermissionEngine {
         };
         let workdir = shell::resolve_workdir(self.workspace.root(), &request);
         let outside = self.workspace.classify_resolved(&workdir) == PathScope::Outside;
-        let needs_approval = self.mode == ApprovalMode::Ask || outside;
+        let summary = format!(
+            "{}\n  in {}\n  effect: {}",
+            shell::display_command(&shell::wrap_command(&request)),
+            workdir.display(),
+            request.effect.as_str()
+        );
+        // The model classified the effect; only a declared state change
+        // needs a review on the no-approval path.
+        let review_required = request.effect == Effect::StateChanging;
+        self.gate(
+            summary,
+            outside,
+            review_required,
+            "a state_changing command",
+            request.review(),
+        )
+    }
 
-        if needs_approval {
-            let mut summary = format!(
-                "{}\n  in {}\n  effect: {}",
-                shell::display_command(&shell::wrap_command(&request)),
-                workdir.display(),
-                request.effect.as_str()
-            );
-            if let Some(review) = request.review() {
+    /// Same order as `decide_shell`. An edit is state-changing by the tool's
+    /// contract, so the review is required on the no-approval path without
+    /// any model-declared effect (PLAN.md §5.10).
+    fn decide_edit_file(&mut self, call: &ToolCall) -> Decision {
+        let request = match EditFileRequest::parse(&call.input) {
+            Ok(request) => request,
+            Err(message) => return Decision::Deny(message),
+        };
+        let path = edit::resolve_path(self.workspace.root(), &request);
+        let outside = self.workspace.classify_resolved(&path) == PathScope::Outside;
+        let summary = format!(
+            "edit_file {}\n  in {}\n  {}",
+            request.path,
+            self.workspace.root().display(),
+            edit::describe_change(&request)
+        );
+        self.gate(summary, outside, true, "an edit", request.review())
+    }
+
+    /// The tail shared by every action tool: which path applies, then the
+    /// handshake on that path, then the surface.
+    ///
+    /// Host approval path (`ask` mode, or outside the workspace): the summary,
+    /// any supplied review, and the outside marker go to the approver; a
+    /// review is never required here, because host approval is the guarantee
+    /// and Keel must not strengthen PIRA silently. No-approval path: a
+    /// required review must be present and is announced before `Allow`.
+    fn gate(
+        &mut self,
+        mut summary: String,
+        outside: bool,
+        review_required: bool,
+        what: &str,
+        review: Option<&str>,
+    ) -> Decision {
+        if self.mode == ApprovalMode::Ask || outside {
+            if let Some(review) = review {
                 summary.push_str(&format!("\n  Safety: {review}"));
             }
             if outside {
@@ -122,15 +168,13 @@ impl PermissionEngine {
             }
             return self.ask(&summary);
         }
-
-        match (request.effect, request.review()) {
-            (Effect::ReadOnly, _) => Decision::Allow,
-            (Effect::StateChanging, None) => Decision::Deny(
-                "PIRA Full-Permission Behavior: a state_changing command needs a non-empty \
-                 safety_review before it runs without host approval; resend with the review"
-                    .to_string(),
-            ),
-            (Effect::StateChanging, Some(review)) => {
+        match (review_required, review) {
+            (false, _) => Decision::Allow,
+            (true, None) => Decision::Deny(format!(
+                "PIRA Full-Permission Behavior: {what} needs a non-empty safety_review before \
+                 it runs without host approval; resend with the review"
+            )),
+            (true, Some(review)) => {
                 self.approver.announce(&format!("Safety: {review}"));
                 Decision::Allow
             }
@@ -145,6 +189,9 @@ impl Hooks for PermissionEngine {
         }
         if call.name == shell::TOOL_NAME {
             return self.decide_shell(call);
+        }
+        if call.name == edit::TOOL_NAME {
+            return self.decide_edit_file(call);
         }
         match self.mode {
             ApprovalMode::Ask => self.ask(&format!("{}({})", call.name, call.input)),

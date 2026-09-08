@@ -256,3 +256,113 @@ fn malformed_shell_input_is_denied_with_the_parser_message_and_surfaces_no_revie
         assert!(surface.borrow().announcements.is_empty());
     }
 }
+
+fn edit_call(review: Option<&str>, path: &str) -> ToolCall {
+    let mut input = json!({
+        "path": path,
+        "old_text": "def build_parser():\n    return parser",
+        "new_text": "def build_parser():\n    parser.add_argument(\"--month\")\n    return parser"
+    });
+    if let Some(review) = review {
+        input["safety_review"] = json!(review);
+    }
+    call("edit_file", input)
+}
+
+#[test]
+fn edit_file_in_ask_mode_prompts_with_sizes_and_never_the_body() {
+    let dir = TempDir::new("perm-edit-ask");
+    let (mut asking, surface) = engine(ApprovalMode::Ask, &dir.path, true);
+
+    let decision = asking.decide(&edit_call(Some("Adds --month."), "tally/cli.py"));
+
+    assert_eq!(decision, Decision::Allow);
+    let prompt = surface.borrow().prompts[0].clone();
+    assert!(
+        prompt.starts_with("edit_file tally/cli.py\n  in "),
+        "{prompt}"
+    );
+    assert!(
+        prompt.contains("\n  replaces 37 bytes (2 lines) with 72 bytes (3 lines)"),
+        "{prompt}"
+    );
+    assert!(prompt.contains("\n  Safety: Adds --month."), "{prompt}");
+    assert!(
+        !prompt.contains("add_argument"),
+        "the body never appears in the prompt: {prompt}"
+    );
+    assert!(surface.borrow().announcements.is_empty());
+
+    // No review is required on the approval path.
+    let (mut without_review, surface) = engine(ApprovalMode::Ask, &dir.path, true);
+    assert_eq!(
+        without_review.decide(&edit_call(None, "tally/cli.py")),
+        Decision::Allow
+    );
+    assert!(!surface.borrow().prompts[0].contains("Safety:"));
+}
+
+#[test]
+fn edit_file_in_full_mode_requires_and_announces_the_review() {
+    let dir = TempDir::new("perm-edit-full");
+    let (mut full, surface) = engine(ApprovalMode::Full, &dir.path, false);
+
+    for review in [None, Some("  ")] {
+        match full.decide(&edit_call(review, "tally/cli.py")) {
+            Decision::Deny(reason) => {
+                assert!(
+                    reason.contains("an edit needs a non-empty safety_review"),
+                    "{reason}"
+                );
+                assert!(reason.contains("Full-Permission Behavior"), "{reason}");
+            }
+            other => panic!("expected Deny, got {other:?}"),
+        }
+    }
+    assert!(surface.borrow().announcements.is_empty());
+
+    let decision = full.decide(&edit_call(
+        Some(" Adds --month; reversible. "),
+        "tally/cli.py",
+    ));
+    assert_eq!(decision, Decision::Allow);
+    assert_eq!(
+        surface.borrow().announcements,
+        vec!["Safety: Adds --month; reversible.".to_string()]
+    );
+    assert!(surface.borrow().prompts.is_empty());
+}
+
+#[test]
+fn edit_file_outside_the_workspace_asks_in_full_mode_and_needs_no_review() {
+    let dir = TempDir::new("perm-edit-outside");
+    let outside_file = format!("{}/hosts", outside_dir().replace('\\', "/"));
+    let (mut declining, surface) = engine(ApprovalMode::Full, &dir.path, false);
+
+    let decision = declining.decide(&edit_call(None, &outside_file));
+
+    assert!(matches!(decision, Decision::Deny(_)), "{decision:?}");
+    let prompt = surface.borrow().prompts[0].clone();
+    assert!(prompt.contains("(outside the workspace)"), "{prompt}");
+    assert!(surface.borrow().announcements.is_empty());
+}
+
+#[test]
+fn malformed_edit_file_input_is_denied_with_the_parser_message() {
+    let dir = TempDir::new("perm-edit-malformed");
+    for mode in [ApprovalMode::Full, ApprovalMode::Ask] {
+        let (mut gate, surface) = engine(mode, &dir.path, true);
+        let decision = gate.decide(&call(
+            "edit_file",
+            json!({ "path": "f", "old_text": "", "new_text": "x", "safety_review": "r" }),
+        ));
+        match decision {
+            Decision::Deny(reason) => {
+                assert!(reason.contains("'old_text' must not be empty"), "{reason}")
+            }
+            other => panic!("expected Deny, got {other:?}"),
+        }
+        assert!(surface.borrow().prompts.is_empty());
+        assert!(surface.borrow().announcements.is_empty());
+    }
+}

@@ -15,6 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Value};
 
 use crate::agent::{Decision, Hooks};
+use crate::edit::{self, EditFileRequest};
 use crate::message::{Block, Message, Provenance, Role, ToolCall};
 use crate::pira::{home_dir, sha256_hex, PiraError};
 use crate::shell::{self, ShellRequest};
@@ -262,6 +263,20 @@ impl Hooks for Recorder<'_> {
             if let Ok(request) = ShellRequest::parse(&call.input) {
                 event["handshake"] = json!({
                     "effect": request.effect.as_str(),
+                    "review_present": request.review().is_some(),
+                    "review_source": "model",
+                    "review_validated": "presence_only",
+                });
+            }
+        }
+        // An edit's effect is fixed by the tool's contract, not declared by
+        // the model; `effect_source` says so, so a reader can tell the two
+        // apart (PLAN.md §5.10).
+        if call.name == edit::TOOL_NAME {
+            if let Ok(request) = EditFileRequest::parse(&call.input) {
+                event["handshake"] = json!({
+                    "effect": "state_changing",
+                    "effect_source": "tool_contract",
                     "review_present": request.review().is_some(),
                     "review_source": "model",
                     "review_validated": "presence_only",

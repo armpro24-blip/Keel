@@ -50,6 +50,10 @@ Keel 不附着于任何现有 harness，也不吸收 PIRA。PIRA 保持为独立
 | 持久项目知识 | `AGENT_WORKBOOK.md` | |
 | 仓库导航 | `pira_nav` | |
 | PIRA 的安装、更新与工具二进制 | PIRA 自身流程 | Keel 只读取与校验 |
+| 替换哪个块、换成什么（`edit_file` 的 `old_text`/`new_text`） | PIRA / 模型 | Keel 不改动任一文本 |
+| 恰一匹配、字节保留、路径范围（`edit_file`） | Keel（`edit` 工具） | 零匹配与多匹配是模型可见的失败，Keel 不猜测、不修复 |
+| `edit_file` 的效果分类 | 工具契约（固定为状态变更） | 不由模型声明；日志 `effect_source: tool_contract` |
+| 编辑来源（输入、决策、观察） | Keel SessionLog | `pira_ctx` 只记录命令活动；编辑不是命令 |
 
 ## 4. PIRA 集成契约
 
@@ -184,6 +188,15 @@ shell/action execution      → approval according to current mode
 - 不变量：该会话内每个子进程的 `PIRA_CTX_THREAD_ID` 值恒定。
 - 跨进程延续（resume）待实证需求。
 
+### 5.10 EditFileTool（`edit_file`）
+- **Why**：L1 证明 argv-only 的 shell 无法可靠修改既有文件；Gate B（stdin 写入程序 4/10）与 Gate C（整文件 `content` 6/10）在模型手里丢字节，Gate D（精确块替换）10/10（`docs/evidence/EDIT_FILE_GATE_D_2026-09-08.md`；设计 `docs/DESIGN_EDIT_FILE.md`）。
+- **Owner**：Keel 拥有恰一匹配、字节保留、路径范围与来源；模型拥有替换哪个块、换成什么以及评审内容；效果由工具契约固定。
+- 请求：`path`（相对工作区根或绝对）、`old_text`（非空）、`new_text`（可为空即删除；须异于 `old_text`）、可选 `safety_review`。无 `effect` 字段。
+- 语义：按字节操作。文件须为既有普通文件；统计 `old_text` 字节的非重叠出现次数：0 → 错误（文件与 old_text 的 CRLF 状态不一致时附一句提示）；≥2 → 错误并给出次数；1 → 前缀 + new + 后缀写回。未触及字节与既有行尾由构造保留，文件不解码。不建文件、不建目录、无模糊/正则/replace-all/规范化/diff 预览/原子写（已知上限，升级路径为同目录临时文件加重命名）。
+- 权限：与 shell 同一顺序（§5.6）：结构无效 → 以解析器信息拒绝；`ask` 或路径在工作区外 → 询问，提示只显示 `replaces N bytes (K lines) with M bytes (L lines)` 与评审，不显示正文；无审批路径 → 评审必需（工具契约即状态变更），宣告 `Safety:` 后放行。`Temp` 不强制询问。`permission.rs` 内 shell 与 edit_file 共用一个私有的"路径判定 → 握手 → 显示"尾部。
+- 日志：无新格式；决策 handshake 为 `{effect: state_changing, effect_source: tool_contract, review_present, review_source: model, review_validated: presence_only}`；完整文本在 `input`。
+- 与 `pira_ctx`：编辑不是 shell/exec 调用，不经 `pira_ctx`，也不出现在 `pira_ctx history`；这与 PIRA 在 Claude Code 下把编辑交给宿主原生工具的既有做法一致。SessionLog 是编辑来源的所有者。
+
 ## 6. 实现期已定的选择
 - **第一个真实 provider（用户决定）**：GPT / OpenAI。**端点形态（agent 决定，已记 `pira_dec`）**：Chat Completions + function calling，而非 Responses API，因为它是多数 OpenAI 兼容服务共同支持的形态，直接服务"接入 LLM 即可用"。适配器 `OpenAiChatModel`（`src/openai.rs`）；wire 映射为纯函数 `to_wire`/`from_wire`，无网络即可测试。
 - **同步 HTTP crate**：`ureq` 3（自带 TLS，阻塞调用，无 async runtime）。
@@ -199,8 +212,9 @@ shell/action execution      → approval according to current mode
 | **M1 — 真实模型**（已完成，gate 已关闭） | `OpenAiChatModel`（OpenAI Chat Completions；同步 HTTP，§6）；stdin/stdout REPL；凭据取自环境变量；假工具保留 | shell、PIRA、权限、async | 需要观察真实模型的 tool-use 行为才能继续设计 | 已达成：vLLM 0.27.1 + mistral-small-4-119b 完成单次与单轮三次工具往返，转录跨输入连续；证据见 `docs/evidence/M1_SMOKE_2026-09-07.md` |
 | **M2 — PIRA 上岗** | ContextManager：`AGENTS.md` 逐字节 + host block；`shell` 工具（§5.4）；PIRA policy loader（§5.5，免审批）；`PIRA_CTX_THREAD_ID`；`ask` 模式（动作类调用询问）；WorkspaceManager 身份 + 边界检查；`keel pira check` + `pira.lock` 三态 | `full` 模式、压缩、日志 | 模型需要真正行动 | 验证 token 出现在系统指令；`pira_ctx history` 能看到 Keel 发起的命令 |
 | **M3 — 强制与证据**（已实现） | `full` 模式与越界确认（已在 C 片提前落地）；SessionLog：每会话一个追加式 JSONL（`~/.keel/sessions/<工作区哈希>/<会话>.jsonl`），记录 session_start（host block、模式、PIRA commit 与兼容状态）、每条消息、每个闸门决策（含被拒的）、每次 run 结束、session_end；日志打不开则会话不启动，中途写失败以警告可见；`keel log show FILE` 只渲染不重放；日志不注入模型 | 压缩 | 实际使用中 `ask` 过于频繁（观察到） | 越界写入被拦下（M2 C 实证）；`keel log show` 可重建一次会话而不重放执行 |
+| **文件编辑（已实现，2026-09-08）** | `edit_file`：既有文件中一个精确块的字节级替换（§5.10）；由 L1 与 Gate B/C/D 证据驱动，设计评审后实现 | `write_file`、`apply_patch`、stdin、模糊匹配、新建文件 | L1-R1 回归（同一冻结 L1，只多注册 `edit_file`） | 待 L1-R1 |
 | **M4 — 显式压缩** | `/compact` + 压缩通知 + recap 路径；最简压缩算法 | 自动压缩 | 观察到上下文溢出 | 压缩后模型用 `pira_ctx recap` 续接 |
-| **未排期** | 文件编辑工具（若 shell 编辑被观察到不可靠）、MCP 客户端、Skills、subagents、项目级 `AGENTS.md` 发现、流式、resume、`pira_dir` 重定位、Cargo workspace、TUI | | 各自需要观察到的问题 | |
+| **未排期** | MCP 客户端、Skills、subagents、项目级 `AGENTS.md` 发现、流式、resume、`pira_dir` 重定位、Cargo workspace、TUI | | 各自需要观察到的问题 | |
 
 Skills 扩展"PIRA 如何工作"，MCP/工具扩展"PIRA 能做什么"，二者都不替换身份；架构上只要求 ToolRegistry 可注册外部来源、ContextManager 可追加外部方法文本，不提前实现。
 
@@ -247,7 +261,7 @@ A 片的一个已知真实案例：本机 `~/agent` 停在 af6a477，仍含 `pap
 - **T16 `argv` 中的 shell 操作符**：同一次冒烟里模型三次把 `>` 作为独立 `argv` 元素传给 `echo`/`printf`，命令"成功"（exit 0）却没有任何效果，直到熔断。据此 Keel 在解析时拒绝独立出现的 shell 操作符并给出本平台的 shell 请求形式（不解释、只拒绝，O3 不变）；工具描述改为平台感知。`max_turns` 从 8 提到 32。这两处是"观察到需要"驱动的改动。
 - **T18 `shell` 无 stdin 通道（L1 主导失败，`docs/evidence/L1_2026-09-07.md`）**：`run_process` 给子进程 `Stdio::null()`，多行文件正文只能塞进双重引用的 argv 元素；L1 中 28/42 次调用耗在此处、0 次成功，模型自行尝试的 `python -` 收到空输入。候选机制（用户 2026-09-08 决定，唯一在评估中的机制）：在现有 shell 调用上加可选 UTF-8 `stdin`，保持权限、PIRA、握手、工作区、日志与进程执行路径不变；明确排除 `write_file`/`edit_file`/`apply_patch`、第二条修改路径、自动重试、新 shell 语义、I/O 抽象层级、async、流式、文件写入启发式。两道门（`docs/STDIN_GATES.md`）：Gate A `pira_ctx` 透传 stdin——本机 2026-09-08 通过（5 例，字节级一致，忽略 stdin 的子进程不阻塞），待实验机在 pira_ctx 1.9.0 上复核；Gate B 模型在专用 `stdin` 字段放长载荷而 `argv` 保持数组的可靠性——10 次诊断请求，阈值预注册（≥9 进入设计；7–8 报告待审；≤6 停止）。两门都过才写设计，设计评审后才编码；之后重跑冻结的 L1（L1-R1）作回归，不建 L2。**进展（2026-09-08）**：Gate A 在实验机 pira_ctx 1.9.0 上复核通过；Gate B 结构四项 10/10（1.9–2.4 KB 的 `stdin` 字段下无一次 argv 坍缩），但预注册的 `stdin_complete` 按"逐行原文包含"计为 1/10——该操作化对任务要求的包装程序会惩罚正确的转义，缺失行恰是含三引号、`\d`、`\n` 的行。按预注册规则（≤6 停止）已停止并报告。评审授权在同一批冻结响应上做修复分析（执行每个 stdin 程序、逐字节比对写出的文件；预注册的 1/10 与其动作永久保留；字节级一致为门指标、normalized 仅诊断、阈值不变）：**字节级一致 4/10**（normalized 6/10），exit 0 但字节错误 5/10，未生成文件 1/10；六次失败全部在模型自写包装程序的转义层（f-string 花括号双写 ×2、`\n` 与结尾三引号丢失 ×1、三引号未闭合 ×1、文本模式 CRLF ×2），通道本身 10/10 完整送达。**≤6 ⇒ stdin 候选停止（评审决定 2026-09-08，措辞固定）**：Gate A 经 `pira_ctx` 的 stdin 传输可用；Gate B 结构传输 10/10；修复后的字节级写入结果 4/10；失败全部出在模型自写的写入程序/转义层；因此不据此证据实现可选 shell stdin，也不带 stdin 跑 L1-R1。**不**声称 stdin 本身不可靠；被否决的机制具体是"经 stdin 送达的模型自写写入程序作为可靠文件编辑的解法"；将来独立的工作负载可以单独为通用进程 stdin 提供理由。记录的混杂因素：我写的任务文本要求"stdin 放一个写文件的程序"，10/10 选择了包装模式，零转义模式（正文本身作 stdin、固定复制程序）未被测量；是否另设实验属新决定（`docs/evidence/STDIN_GATE_B_2026-09-08.md`）。
 - **T20 直接结构化文件写入候选（`docs/WRITE_FILE_GATE.md`，2026-09-08）**：stdin 候选停止后，L1 证据使此前推迟的文件写入能力重新进入考虑。设计或实现之前先跑一道诊断 Gate C：同一载荷、同一系统提示、只暴露诊断用 `write_file(path, content)` 工具，请模型恰好调用一次、`content` 逐字节等于给定正文，不要求任何编码/包装/转义；10 次冻结响应，门指标 `content_byte_exact`（JSON 解析后 UTF-8 字节相等，无任何规范化），阈值 9–10 → 写最小设计供评审、不实现；7–8 → 报告停下；≤6 → 停止该候选、不在看到失败后重设计。另报告畸形参数是否类似 L1 的 argv 坍缩。若通过，设计评审从 `WriteFileRequest { path, content, safety_review }` 出发，必须明确解决：工作区/路径强制、ask/full 行为、执行前安全评审、SessionLog 来源、直接文件修改与 PIRA `pira_ctx` 活动记忆所有权的关系；不引入 `edit_file`/`apply_patch`/通用 `FileOperation`/I/O 层级/原子写/diff 预览/父目录创建；`write_file` 按契约即是状态变更，不机械继承 shell 的 `effect` 字段。T19 及其他 L1 修正在文件写入回归实验前不实现，保持后续 L1 比较单变量。**Gate C 结果（2026-09-08，`docs/evidence/WRITE_FILE_GATE_C_2026-09-08.md`）：结构 10/10、路径 10/10、无 L1 式坍缩 0/10，`content_byte_exact` 6/10 ⇒ 按预注册规则（≤6）候选停止，不重设计。** 四次非精确均只差结尾一个换行（content 1834 vs 1835 字节，diff 为空），正文各行含引号、反斜杠、花括号、正则全部完整；正文以围栏代码块呈现，任务文本未说明闭合围栏前的换行是否属于正文——作为事实记录，不作为重解读分数的理由。同一载荷跨通道：L1 argv 内嵌 0 次成功；Gate B stdin 写入程序字节级 4/10；Gate C 顶层 `content` 字节级 6/10、去尾换行后 10/10。两个文件编辑候选均按预注册规则停止；Keel 未动；下一步由评审决定。
-- **T21 精确替换编辑候选 `edit_file(path, old_text, new_text)`（`docs/EDIT_FILE_GATE.md`，2026-09-08）**：Gate C 按预注册规则关闭（结果保留：`write_file` 结构有效 10/10、无 L1 式参数坍缩 10/10、整文件字节精确 6/10、四次失败唯一差异是结尾换行、候选停止；不重解读阈值、不重设计）。新候选问一个更小的编辑表示能否同时避开模型自写的写入/转义层与整文件 EOF/尾换行歧义。Gate D：在冻结的 L1 种子 `tally/cli.py` 上选一处 L1 真实需要的多行编辑（从 `import argparse` 到 `build_parser` 结束的 21 行块，替换为加 `import re`、`month()` 校验器与 `--month` 选项的 35 行块；含双/单引号、`\d` 原始正则、`!r` f-string；在种子中恰出现一次、距 EOF 22 行），原文件、old_text、new_text、期望文件在模型调用前冻结于 `docs/dogfood/edit_file/frozen/`，脚本启动时重导出并校验。只暴露诊断用 `edit_file` 工具，请模型恰好调用一次；不要求补丁、写入程序、shell、编码、转义策略或整文件重写。10 次冻结响应，无采样参数。主指标 `replacement_produces_expected_file`：解析参数 → old_text 在冻结种子中恰出现一次 → 替换 → 与期望文件逐字节比对，无任何规范化；另计 valid/path/old_text 字节精确/new_text 字节精确/唯一性/L1 式坍缩。阈值 9–10 → 写最小设计供评审、不实现；7–8 → 报告停下；≤6 → 停止候选。看到失败后不改候选与计分。若通过，设计评审从 `EditFileRequest { path, old_text, new_text, safety_review }` 出发，须解决：工作区/路径强制、恰一匹配语义、零匹配与多匹配错误、权限行为、full 模式安全评审顺序、SessionLog 来源、与 PIRA 活动记忆的关系、未触及字节与既有行尾的保留；无新证据不加模糊匹配、正则替换、replace-all、空白规范化、父目录创建、新建文件、diff 预览、通用补丁语言。T19 继续推迟。**Gate D 结果（2026-09-08，`docs/evidence/EDIT_FILE_GATE_D_2026-09-08.md`）：主指标 10/10，七项全部满分，无 L1 式坍缩；old_text 681 字节与 new_text 1,074 字节每次逐字节正确且在种子中唯一。** 按预注册规则进入设计评审：最小设计见 `docs/DESIGN_EDIT_FILE.md`（字节级恰一匹配替换；无 `effect` 字段，因工具契约即状态变更，握手在无审批路径上无条件适用；审批提示只显示字节与行数；决策日志 handshake 加 `effect_source: tool_contract`；编辑不经 `pira_ctx`，与 PIRA 在 Claude Code 下把编辑交给宿主原生工具的既有做法一致，SessionLog 为编辑来源的所有者；`permission.rs` 内抽出一个私有握手方法供 shell 与 edit_file 共用）。**未实现，等待评审。** 同一 L1 改动跨通道：argv 内嵌 0 次；stdin 写入程序 4/10；整文件 `content` 6/10；精确替换 10/10。
+- **T21 精确替换编辑候选 `edit_file(path, old_text, new_text)`（`docs/EDIT_FILE_GATE.md`，2026-09-08）**：Gate C 按预注册规则关闭（结果保留：`write_file` 结构有效 10/10、无 L1 式参数坍缩 10/10、整文件字节精确 6/10、四次失败唯一差异是结尾换行、候选停止；不重解读阈值、不重设计）。新候选问一个更小的编辑表示能否同时避开模型自写的写入/转义层与整文件 EOF/尾换行歧义。Gate D：在冻结的 L1 种子 `tally/cli.py` 上选一处 L1 真实需要的多行编辑（从 `import argparse` 到 `build_parser` 结束的 21 行块，替换为加 `import re`、`month()` 校验器与 `--month` 选项的 35 行块；含双/单引号、`\d` 原始正则、`!r` f-string；在种子中恰出现一次、距 EOF 22 行），原文件、old_text、new_text、期望文件在模型调用前冻结于 `docs/dogfood/edit_file/frozen/`，脚本启动时重导出并校验。只暴露诊断用 `edit_file` 工具，请模型恰好调用一次；不要求补丁、写入程序、shell、编码、转义策略或整文件重写。10 次冻结响应，无采样参数。主指标 `replacement_produces_expected_file`：解析参数 → old_text 在冻结种子中恰出现一次 → 替换 → 与期望文件逐字节比对，无任何规范化；另计 valid/path/old_text 字节精确/new_text 字节精确/唯一性/L1 式坍缩。阈值 9–10 → 写最小设计供评审、不实现；7–8 → 报告停下；≤6 → 停止候选。看到失败后不改候选与计分。若通过，设计评审从 `EditFileRequest { path, old_text, new_text, safety_review }` 出发，须解决：工作区/路径强制、恰一匹配语义、零匹配与多匹配错误、权限行为、full 模式安全评审顺序、SessionLog 来源、与 PIRA 活动记忆的关系、未触及字节与既有行尾的保留；无新证据不加模糊匹配、正则替换、replace-all、空白规范化、父目录创建、新建文件、diff 预览、通用补丁语言。T19 继续推迟。**Gate D 结果（2026-09-08，`docs/evidence/EDIT_FILE_GATE_D_2026-09-08.md`）：主指标 10/10，七项全部满分，无 L1 式坍缩；old_text 681 字节与 new_text 1,074 字节每次逐字节正确且在种子中唯一。** 按预注册规则进入设计评审：最小设计见 `docs/DESIGN_EDIT_FILE.md`（字节级恰一匹配替换；无 `effect` 字段，因工具契约即状态变更，握手在无审批路径上无条件适用；审批提示只显示字节与行数；决策日志 handshake 加 `effect_source: tool_contract`；编辑不经 `pira_ctx`，与 PIRA 在 Claude Code 下把编辑交给宿主原生工具的既有做法一致，SessionLog 为编辑来源的所有者；`permission.rs` 内抽出一个私有握手方法供 shell 与 edit_file 共用）。**评审通过并实现（2026-09-08；`new_text` 可为空、不加 `intent`、工具描述改为"相对路径相对工作区根解析，工作区外路径需宿主审批"）；L1-R1 回归待跑。** 同一 L1 改动跨通道：argv 内嵌 0 次；stdin 写入程序 4/10；整文件 `content` 6/10；精确替换 10/10。
 - **T19 空 assistant 回复被当作成功的最终回答（L1 次级观察）**：4 个 run 中 3 个以无工具调用、`text.trim()` 为空的 assistant 消息结束（推理被服务端剥离），`AgentLoop` 将其作为 `final_text` 返回，REPL 只显示 `> `。当前证据只确立"空 assistant 消息不是有效完成"。建议的最小修正：在 `AgentLoop::run` 中把"无工具调用且文本为空白"作为显式错误 `LoopError::EmptyAssistantResponse` 返回（转录保留该消息，供检查），不加自动重试。与 stdin 机制逻辑与提交都分开；待评审。
 - **T17 行尾与哈希可比性**：PIRA 仓库存 LF，但 Windows 上 `core.autocrlf=true` 的检出把 `AGENTS.md` 变成 CRLF；Keel 按"原样字节"发送并哈希，因此同一 PIRA commit 在 Windows 与 Linux 上的 `pira.lock` 文件哈希不同，也多出约 243 个换行 token。单机内一致性不受影响；跨机器只能比 `source_commit`。Keel 不做行尾归一化（保持"发送安装的确切字节"）。暂不向上游提出任何建议（用户决策：不基于本轮证据联系 PIRA 上游）。
 - **T12 大小写**：路径分量只在 Windows 上做大小写不敏感比较；macOS 默认文件系统同样不区分大小写但未处理。影响限于边界误判为 Outside（偏保守），非安全问题。
@@ -275,6 +289,11 @@ M2 起：
 15. 结构无效的 `shell` 请求以解析器的校验信息被拒绝：不显示评审、不进入审批、不进入工具。
 16. 每条结构有效的 `shell` 决策日志带 `handshake { effect, review_present, review_source: "model", review_validated: "presence_only" }`，`keel log show` 渲染之；结构无效的 `shell` 调用以解析器的理由被拒绝且没有 handshake，因为不存在有效的 ShellRequest。Keel 从不记录自己撰写的评审。
 17. 没有任何代码路径从 `argv` 推断 `effect` 或评估评审内容。
+18. `edit_file` 只在 `old_text` 字节在文件中恰出现一次时写入；0 或 ≥2 次 ⇒ 错误观察，文件字节不变。
+19. `edit_file` 写回后，替换块之外的每个字节（含行尾、非 UTF-8 字节）与写回前相同；不创建文件或目录。
+20. `edit_file` 在无审批路径上无条件要求非空 `safety_review`（工具契约即状态变更），并在执行前宣告；`ask` 或工作区外路径 ⇒ 询问，提示含字节与行数、不含正文。
+21. 每条结构有效的 `edit_file` 决策日志带 `handshake { effect: state_changing, effect_source: tool_contract, review_present, review_source: model, review_validated: presence_only }`；shell 的 handshake 对象不变。
+22. 结构无效的 `edit_file` 请求以解析器信息被拒绝，不进入审批、不进入工具。
 
 M4 起：
 10. 压缩只由用户命令触发。
