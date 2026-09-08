@@ -58,5 +58,8 @@ Reading: A4's reported hex is the UTF-8 encoding of `café — 中文\n`
 (`63 61 66 c3a9 20 e28094 20 e4b8ad e69687 0a`, 17 bytes), so the script
 reached the child unchanged through `pira_ctx`. Pass criterion (`stdout`
 contains `KEEL_STDIN_OK`, exit 0) met in A1, A2, A4; A3 is the unwrapped
-control; A5 shows no hang when the child never reads stdin. Lab
-confirmation on `pira_ctx 1.9.0` pending.
+control; A5 shows no hang when the child never reads stdin.
+
+## Lab confirmation (2026-09-08 13:27 UTC, `pira_ctx 1.9.0`, Python 3.12.10)
+
+Same script, same five cases, workdir `C:/Users/LM/AppData/Local/Temp/keel-gate-a-t7evj7cl`: every exit 0, every stdout identical to the local run apart from the pira_ctx result ids (`20260908-132741-d6e0df351f78`, `…-db064f7a7cb5`, `…-79b726aafe8d`, `…-a9c685491cee`), A3 `KEEL_STDIN_OK\r\n`, A4 hex `636166c3a920e2809420e4b8ade696870a`, `gate_a_out.txt` identical, history four rows. Gate A holds on the version L1 used.

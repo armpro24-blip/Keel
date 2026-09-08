@@ -1,6 +1,11 @@
 # Optional stdin on the shell tool: feasibility gates
 
-Status: **Gate A passed locally (2026-09-08); Gate B prepared, not yet run.**
+Status: **Gate A passed locally and on the lab (`pira_ctx 1.9.0`); Gate B
+run 2026-09-08: structure 10/10, completeness 1/10 on the pre-registered
+line-containment metric, which turned out to penalize correct escaping
+inside the writer program the task itself demanded. Per the pre-registered
+rule this is a stop-and-report; an execute-based re-scoring is prepared and
+awaits the reviewer's decision** (`docs/evidence/STDIN_GATE_B_2026-09-08.md`).
 Nothing in Keel is changed. The candidate mechanism under evaluation, and
 the only one, is:
 
@@ -35,7 +40,7 @@ used); the script is 30 seconds.
 `pira_ctx history` in that workspace shows the four wrapped runs with exit 0
 and their intents. stderr was empty in every case.
 
-**Gate A: pass.** `pira_ctx` forwards stdin to the wrapped program
+**Gate A: pass** (locally and, 2026-09-08 13:27 UTC, on the lab with `pira_ctx 1.9.0`, identical output). `pira_ctx` forwards stdin to the wrapped program
 byte-for-byte (A4's hex equals the UTF-8 of the script's string), with or
 without a trailing newline, and does not block when the child never reads
 it (A5). Every case ran in `pira_ctx` automatic mode, which retained the
@@ -93,19 +98,23 @@ Interpretation, fixed in advance:
   failure would sit in the model's or the tool parser's handling of long
   structured arguments, which a `write_file(content=…)` tool would share.
 
-### Lab instruction
+### Result (2026-09-08)
 
-```bash
-cd <Keel> && git pull --ff-only && git rev-parse HEAD
-python docs/dogfood/stdin/gate_a.py                 # 30 s; report the whole output (pira_ctx 1.9.0)
-python docs/dogfood/stdin/gate_b.py --base-url http://192.168.3.103:8000/v1 \
-    --model "nvidia/Qwen3.6-35B-A3B-NVFP4" --out ~/Desktop/gate_b --runs 10
-```
+valid shell call 10/10, argv array 10/10, stdin string 10/10, fields
+separate 10/10, **stdin materially complete 1/10 as operationalized**. All
+ten responses sent `argv = ["python", "-"]` with a Python writer program on
+stdin embedding the body as a string literal; the lines scored missing are
+those whose characters must be escaped inside such a literal. The
+pre-registered ≤6/10 rule applies to the recorded value: stop and report.
 
-Report: the Gate A output; `gate_b/scores.txt` in full; for every response
-that is not fully valid, the raw `tool_calls[0].function.arguments` string
-(first 300 characters) and `finish_reason`; the `usage` of each response;
-vLLM version and the model's `max_model_len`. Keep the raw responses.
+The metric's operationalization was mine and is faulty for wrapper
+programs, which the task text required. The faithful operationalization is
+to execute each stdin program in a throwaway directory and compare the
+written `tally/cli.py` byte for byte with the payload:
+`python docs/dogfood/stdin/gate_b_rescore.py ~/Desktop/gate_b`. Whether to
+adopt it, with the same thresholds applied to the byte-exact count, is the
+reviewer's decision. Details and raw data:
+`docs/evidence/STDIN_GATE_B_2026-09-08.md`.
 
 ## If both gates pass: the design to be reviewed before any code
 
