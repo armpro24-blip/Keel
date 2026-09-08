@@ -110,8 +110,13 @@ Observations first.
    with the body itself as stdin) was available and unused in 10/10. No
    instruction is added; this is noted for L1-R1 interpretation only.
 
-Decision requested from the reviewer: (a) accept the execute-based
-re-scoring as the operationalization of "stdin materially complete" and have
-the lab run `gate_b_rescore.py ~/Desktop/gate_b`, applying the same
-pre-registered thresholds to its byte-exact count; or (b) treat 1/10 as the
-verdict and stop the stdin candidate. Keel is unchanged either way.
+## Reviewer decision (2026-09-08): (a), repair analysis
+
+Preserved permanently: preregistered line-containment score = 1/10;
+preregistered action = stop and report. The repair analysis executes the
+frozen responses' stdin programs and compares the written file byte for
+byte with the payload (`gate_b_rescore.py`); byte-exact is the gate
+metric, normalized equality is diagnostic only; thresholds 9–10 → design
+review (no implementation), 7–8 → report and stop, ≤6 → stop the
+candidate. No new model calls; no frozen response changed. Result: pending
+the lab run.

@@ -39,6 +39,7 @@ def normalized(data):
 
 def main(directory):
     exact = normalized_ok = ran = 0
+    exit0_wrong = no_file = nonzero_exit = 0
     rows = []
     for index in range(1, 11):
         path = os.path.join(directory, f"response_{index:02d}.json")
@@ -64,7 +65,10 @@ def main(directory):
         ran += 1
         target = os.path.join(workdir, "tally", "cli.py")
         written = open(target, "rb").read() if os.path.exists(target) else None
+        if result.returncode != 0:
+            nonzero_exit += 1
         if written is None:
+            no_file += 1
             rows.append(
                 f"run {index:02d}: exit {result.returncode}; no tally/cli.py written; "
                 f"stderr: {result.stderr.decode('utf-8', 'replace').strip().splitlines()[-1:]}"
@@ -74,6 +78,8 @@ def main(directory):
         is_norm = normalized(written) == normalized(EXPECTED)
         exact += is_exact
         normalized_ok += is_norm
+        if result.returncode == 0 and not is_exact:
+            exit0_wrong += 1
         line = f"run {index:02d}: exit {result.returncode}; wrote {len(written)} bytes; exact={is_exact} normalized={is_norm}"
         if not is_norm:
             diff = list(
@@ -91,7 +97,9 @@ def main(directory):
             line += f" (differs only in line endings or trailing newline: written ends {written[-4:]!r})"
         rows.append(line)
     print("\n".join(rows))
-    print(f"\nprograms run {ran}/10; file byte-exact {exact}/10; equal after CRLF/trailing-newline normalization {normalized_ok}/10")
+    print(f"\nprograms run {ran}/10; file byte-exact {exact}/10 (gate metric); equal after CRLF/trailing-newline normalization {normalized_ok}/10 (diagnostic only)")
+    print(f"exited 0 but wrote incorrect bytes: {exit0_wrong}/10; failed to create tally/cli.py: {no_file}/10; non-zero exit: {nonzero_exit}/10")
+    print("A non-zero exit with a SyntaxError, or a diff confined to lines containing quotes, backslashes or braces, points at the model's own escaping layer inside the writer program; judge from the rows above.")
 
 
 if __name__ == "__main__":

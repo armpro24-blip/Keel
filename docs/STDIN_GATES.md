@@ -107,14 +107,46 @@ stdin embedding the body as a string literal; the lines scored missing are
 those whose characters must be escaped inside such a literal. The
 pre-registered ≤6/10 rule applies to the recorded value: stop and report.
 
-The metric's operationalization was mine and is faulty for wrapper
-programs, which the task text required. The faithful operationalization is
-to execute each stdin program in a throwaway directory and compare the
-written `tally/cli.py` byte for byte with the payload:
-`python docs/dogfood/stdin/gate_b_rescore.py ~/Desktop/gate_b`. Whether to
-adopt it, with the same thresholds applied to the byte-exact count, is the
-reviewer's decision. Details and raw data:
-`docs/evidence/STDIN_GATE_B_2026-09-08.md`.
+Preserved permanently:
+
+```text
+preregistered line-containment score = 1/10
+preregistered action = stop and report
+```
+
+**Reviewer decision (2026-09-08): repair analysis authorized.** The task
+itself required a Python writer program on stdin; correct escaping of
+`"""`, `\d` and `\n` inside that program made the line-containment metric
+classify intact content as missing. The repair analysis measures the
+intended construct by executing the frozen model output and comparing the
+resulting file with the required payload. It is a reviewer-authorized
+correction of a faulty operationalization, not a rewrite of the
+preregistered result. No new model calls; no frozen response changed.
+
+```text
+python docs/dogfood/stdin/gate_b_rescore.py ~/Desktop/gate_b
+```
+
+Gate metric: **byte-exact equality**. `normalized` equality is diagnostic
+only and is not substituted after seeing the results. Thresholds:
+
+```text
+byte-exact 9–10/10 → feasibility supported → stdin design review (no implementation yet)
+byte-exact 7–8/10  → report and stop for review
+byte-exact ≤6/10   → stop the stdin candidate
+```
+
+Reported per run: exit code, bytes written, byte-exact, normalized, short
+diff when unequal; separately: programs that exited 0 but wrote incorrect
+bytes, programs that created no file, and whether any failure arose from
+the model's writer-program escaping layer.
+
+Limitation retained whatever the score: Gate B establishes that long
+structured stdin can survive the tool-call channel and can carry a writer
+program that reproduces the requested payload. It does not establish that
+models will naturally choose the zero-escaping stdin pattern or that stdin
+alone will make real coding edits reliable. That question belongs to
+L1-R1. Details and raw data: `docs/evidence/STDIN_GATE_B_2026-09-08.md`.
 
 ## If both gates pass: the design to be reviewed before any code
 
