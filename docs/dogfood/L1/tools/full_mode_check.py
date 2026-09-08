@@ -7,7 +7,8 @@ Read-only. For every shell and edit_file decision it reports whether the
 call was state-changing (edit_file by contract; shell by the model's
 declared effect), whether a review was present, the decision, and whether
 the decision event precedes the tool_result of the same call_id in the log.
-It counts `Safety:` lines and `approve?` prompts in the transcript, denials
+It counts `Safety:` announcements and `approve?` prompts in the transcript
+(at line start, or directly after the REPL's `> ` prompt), denials
 for a missing review, and recoveries (a later allowed call to the same tool
 with the same path or argv after such a denial). Ordering between the
 announcement and execution is by construction of the loop (decide, which
@@ -79,8 +80,10 @@ def main(log_path, transcript_path):
                 recoveries += 1
                 break
 
-    safety_lines = len(re.findall(r"^Safety: ", transcript, flags=re.M))
-    approvals = len(re.findall(r"^approve\? ", transcript, flags=re.M))
+    # An announcement or prompt printed right after the REPL prompt shares its
+    # line with the "> " marker (L1-R2 transcript line 13), so both forms count.
+    safety_lines = len(re.findall(r"^(?:> )?Safety: ", transcript, flags=re.M))
+    approvals = len(re.findall(r"^(?:> )?approve\? ", transcript, flags=re.M))
     outside = transcript.count("(outside the workspace)")
 
     print("\n".join(rows))
