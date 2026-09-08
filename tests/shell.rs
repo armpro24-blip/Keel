@@ -336,4 +336,13 @@ fn the_schema_declares_the_handshake_fields() {
     assert!(spec
         .description
         .contains("state_changing command needs a safety_review"));
+    // The pira_ctx wrapping is Keel's job, and the description says so
+    // (L1-R1 saw the model try to wrap commands itself).
+    assert!(spec
+        .description
+        .contains("do not wrap ordinary commands in pira_ctx yourself"));
+    assert!(properties["intent"]["description"]
+        .as_str()
+        .unwrap()
+        .contains("do not put it in argv"));
 }

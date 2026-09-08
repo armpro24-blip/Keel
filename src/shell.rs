@@ -407,10 +407,13 @@ impl Tool for ShellTool {
             description: format!(
                 "Run a program with arguments. argv is executed directly, with no shell: \
                  redirection, pipes, and && are not interpreted, and passing them as arguments \
-                 is rejected. If you need a shell, {}. Every command runs through pira_ctx with \
-                 your intent, except PIRA internal tools, which run directly. Returns stdout, \
-                 stderr, and the exit code. In full-permission/no-approval mode a state_changing \
-                 command needs a safety_review before it runs.",
+                 is rejected. If you need a shell, {}. Provide the actual command in argv and \
+                 its purpose in the top-level intent field. For ordinary commands, Keel \
+                 automatically runs argv through pira_ctx; do not wrap ordinary commands in \
+                 pira_ctx yourself. Invoke a PIRA internal tool directly only when that tool \
+                 itself is the intended command. Returns stdout, stderr, and the exit code. In \
+                 full-permission/no-approval mode a state_changing command needs a \
+                 safety_review before it runs.",
                 shell_hint()
             ),
             input_schema: json!({
@@ -424,7 +427,7 @@ impl Tool for ShellTool {
                     },
                     "intent": {
                         "type": "string",
-                        "description": "One line, at most 256 UTF-8 bytes: prospective action + target + purpose (pira_ctx --intent)."
+                        "description": "One line, at most 256 UTF-8 bytes: prospective action + target + purpose. Keel passes it to pira_ctx --intent; do not put it in argv."
                     },
                     "mode": {
                         "type": "string",
