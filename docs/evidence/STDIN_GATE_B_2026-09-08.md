@@ -118,5 +118,99 @@ frozen responses' stdin programs and compares the written file byte for
 byte with the payload (`gate_b_rescore.py`); byte-exact is the gate
 metric, normalized equality is diagnostic only; thresholds 9–10 → design
 review (no implementation), 7–8 → report and stop, ≤6 → stop the
-candidate. No new model calls; no frozen response changed. Result: pending
-the lab run.
+candidate. No new model calls; no frozen response changed.
+
+## Repair analysis result (lab, 2026-09-08, Keel `8e34a81`)
+
+Command run exactly as authorized: `python docs/dogfood/stdin/gate_b_rescore.py ~/Desktop/gate_b`.
+No new model calls; frozen responses unchanged. Output verbatim:
+
+```text
+run 01: exit 0; wrote 1837 bytes; exact=False normalized=False
+    @@ -51 +51 @@
+    -        lines[-1] = f"{'total':<12}{sum(totals.values()):>10.2f}"
+    +        lines[-1] = f"{{'total':<12}}{sum(totals.values()):>10.2f}"
+run 02: exit 0; wrote 1830 bytes; exact=False normalized=False
+    @@ -1 +1 @@
+    -"""Command-line entry point: ``python -m tally report FILE [--top N] [--month YYYY-MM]``."""
+    +"""Command-line entry point: ``python -m tally report FILE [--top N] [--month YYYY-MM]``.
+    @@ -50 +50,2 @@
+    -        lines = output.split("\n")
+    +        lines = output.split("
+    +")
+    @@ -52 +53,2 @@
+run 03: exit 0; wrote 1835 bytes; exact=True normalized=True
+run 04: exit 0; wrote 1835 bytes; exact=True normalized=True
+run 05: exit 0; wrote 1835 bytes; exact=True normalized=True
+run 06: exit 0; wrote 1835 bytes; exact=True normalized=True
+run 07: exit 1; no tally/cli.py written; stderr: ['SyntaxError: unterminated triple-quoted string literal (detected at line 59)']
+run 08: exit 0; wrote 1889 bytes; exact=False normalized=True (differs only in line endings or trailing newline: written ends b' 0\r\n')
+run 09: exit 0; wrote 1889 bytes; exact=False normalized=True (differs only in line endings or trailing newline: written ends b' 0\r\n')
+run 10: exit 0; wrote 1837 bytes; exact=False normalized=False
+    @@ -51 +51 @@
+    -        lines[-1] = f"{'total':<12}{sum(totals.values()):>10.2f}"
+    +        lines[-1] = f"{{'total':<12}}{sum(totals.values()):>10.2f}"
+
+programs run 10/10; file byte-exact 4/10 (gate metric); equal after CRLF/trailing-newline normalization 6/10 (diagnostic only)
+exited 0 but wrote incorrect bytes: 5/10; failed to create tally/cli.py: 1/10; non-zero exit: 1/10
+```
+
+| run | exit | bytes | byte-exact | normalized | cause |
+|---|---|---|---|---|---|
+| 01 | 0 | 1837 | no | no | f-string braces doubled (`{{'total':<12}}`): one escaping layer too many |
+| 02 | 0 | 1830 | no | no | `\n` inside the body became a real newline; closing `"""` of the docstring lost |
+| 03 | 0 | 1835 | **yes** | yes | |
+| 04 | 0 | 1835 | **yes** | yes | |
+| 05 | 0 | 1835 | **yes** | yes | |
+| 06 | 0 | 1835 | **yes** | yes | |
+| 07 | 1 | none | no | no | writer program itself invalid: unterminated triple-quoted string |
+| 08 | 0 | 1889 | no | yes | content correct, written in text mode on Windows: CRLF |
+| 09 | 0 | 1889 | no | yes | same |
+| 10 | 0 | 1837 | no | no | f-string braces doubled, as run 01 |
+
+Separately, as required: programs that exited 0 but wrote incorrect bytes
+**5/10** (01, 02, 08, 09, 10); programs that created no file **1/10** (07);
+non-zero exit 1/10 (07). **Every failure arose in the model's own
+writer-program layer**: braces (01, 10), backslash and quote escaping (02),
+an unterminated literal (07), text-mode line-ending translation (08, 09).
+None arose in the tool-call channel: all ten stdin strings reached the
+interpreter intact, run 07 included (its SyntaxError is in the program the
+model wrote, at line 59 of that program).
+
+### Statement
+
+The preregistered line-containment metric scored 1/10 and correctly
+triggered stop-and-report under the written protocol. Review found that this
+operationalization penalized escaping required by the writer-program task.
+On the same frozen responses, reviewer-authorized executable byte-exact
+rescoring scored **4/10**. This repair analysis answers the intended
+stdin-feasibility question: under the pre-registered thresholds (≤6/10),
+**the stdin candidate is stopped.** `normalized` equality (6/10) is
+diagnostic only and is not substituted.
+
+### What this does and does not show
+
+- Shown: a 1.9–2.4 KB `stdin` string survives the tool-call channel
+  structurally intact 10/10 and reaches the interpreter unchanged. The L1
+  collapse of long `argv` payloads did not recur with a dedicated string
+  field (with the context-size caveat recorded above).
+- Shown: when the model carries the payload inside a Python string literal
+  of its own writer program, it reproduces the file byte-exactly 4/10 and
+  content-exactly 6/10. The added escaping layer, not the channel, is where
+  it fails, and three of the six failures are silent (exit 0, wrong bytes).
+- Not shown: what the model does when the body itself is the stdin and the
+  program is a fixed copier (`sys.stdin.buffer.read()` → file), the
+  zero-escaping pattern. The task text I wrote asked for "a short Python
+  program on stdin that writes the body", which selected the wrapper pattern
+  in 10/10 runs. Gate B therefore measured "stdin + model-authored writer
+  program", not "stdin as the file body". This is a confound in my design,
+  recorded here, not a reason to reinterpret the score; whether a separately
+  designed experiment on the zero-escaping pattern is warranted is a new
+  decision for the reviewer, not a continuation of this gate.
+
+Retained limitation regardless of score: Gate B establishes that long
+structured stdin can survive the tool-call channel and can carry a writer
+program that reproduces the requested payload. It does not establish that
+models will naturally choose the zero-escaping stdin pattern or that stdin
+alone will make real coding edits reliable. That question belongs to L1-R1,
+which is not run because the candidate is stopped.

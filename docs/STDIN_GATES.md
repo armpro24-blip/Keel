@@ -1,12 +1,12 @@
 # Optional stdin on the shell tool: feasibility gates
 
-Status: **Gate A passed locally and on the lab (`pira_ctx 1.9.0`); Gate B
-run 2026-09-08: structure 10/10, completeness 1/10 on the pre-registered
-line-containment metric, which turned out to penalize correct escaping
-inside the writer program the task itself demanded. Per the pre-registered
-rule this is a stop-and-report; an execute-based re-scoring is prepared and
-awaits the reviewer's decision** (`docs/evidence/STDIN_GATE_B_2026-09-08.md`).
-Nothing in Keel is changed. The candidate mechanism under evaluation, and
+Status: **stdin candidate stopped (2026-09-08).** Gate A passed (local and
+lab). Gate B: structure 10/10; preregistered line-containment completeness
+1/10 (stop-and-report, preserved); reviewer-authorized byte-exact repair
+rescoring on the same frozen responses **4/10**, below the ≤6/10 stop
+threshold. Every failure was in the model's own writer-program escaping
+layer, not in the channel (`docs/evidence/STDIN_GATE_B_2026-09-08.md`).
+Nothing in Keel is changed; the design section below was not entered. The candidate mechanism under evaluation, and
 the only one, is:
 
 > Add optional UTF-8 stdin to the existing shell invocation, preserving the
@@ -140,6 +140,14 @@ Reported per run: exit code, bytes written, byte-exact, normalized, short
 diff when unequal; separately: programs that exited 0 but wrote incorrect
 bytes, programs that created no file, and whether any failure arose from
 the model's writer-program escaping layer.
+
+**Result: byte-exact 4/10** (normalized 6/10, diagnostic only); exit 0 with
+wrong bytes 5/10; no file 1/10; all six failures in the writer-program
+escaping layer (doubled f-string braces ×2, `\n`/closing-quote loss ×1,
+unterminated literal ×1, text-mode CRLF ×2). Under the thresholds above the
+candidate is stopped. Confound recorded: the task text selected the
+writer-program pattern in 10/10 runs, so the zero-escaping pattern (body as
+stdin, fixed copier program) was not measured.
 
 Limitation retained whatever the score: Gate B establishes that long
 structured stdin can survive the tool-call channel and can carry a writer
