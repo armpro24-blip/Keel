@@ -66,7 +66,9 @@ AgentLoop ── Model (trait) ── FakeModel | OneRealModelAdapter
 M0–M3 done; T15 closed. Current phase: long-horizon dogfooding
 (`docs/dogfood/L1/`). L1 failed on file editing; three gated experiments led
 to `edit_file` (`docs/DESIGN_EDIT_FILE.md`); the L1-R1 rerun with only that
-tool added passed 7/7 (`docs/evidence/L1R1_2026-09-08.md`). Done so far:
+tool added passed 7/7, and L1-R2 in full mode passed 7/7 with zero host
+prompts and every state-changing action preceded by the model's announced
+review (`docs/evidence/L1R1_2026-09-08.md`, `L1R2_2026-09-08.md`). Done so far:
 
 - M0: the agent loop, a scripted `FakeModel`, a `Tool` trait with one
   deterministic tool, deterministic tests.

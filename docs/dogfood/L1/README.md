@@ -301,6 +301,10 @@ cause → stop and report; no redesign during the run. The report is
 `docs/evidence/L1R2_<date>.md`; work stops there. T19 and the
 shell-description correction are separate changes reviewed afterwards.
 
+**Result (2026-09-08): passed, 7/7; handshake held 11/11; host approvals 0;
+seed tests 13/13 preserved, 6 added. Full mode recorded as a viable
+autonomous path for this workload (`docs/evidence/L1R2_2026-09-08.md`).**
+
 ## Review by observed failure
 
 The report is read against these categories, none of which is presumed:
