@@ -430,3 +430,53 @@ fn each_call_is_decided_immediately_before_it_executes() {
         ]
     );
 }
+
+#[test]
+fn an_empty_or_blank_final_message_is_an_error_and_stays_in_the_transcript() {
+    // T19: three of four L1 runs ended with an assistant message carrying
+    // neither tool calls nor text; the loop treated it as the final answer.
+    for blank in ["", "   \n\t  "] {
+        let mut model = FakeModel::new(vec![Message::assistant_text(blank)]);
+        let mut tools = echo_registry();
+        let mut transcript = Vec::new();
+
+        let error = agent(3)
+            .run(&mut model, &mut tools, &mut AllowAll, &mut transcript, "go")
+            .unwrap_err();
+
+        assert_eq!(error, LoopError::EmptyAssistantResponse, "{blank:?}");
+        assert_eq!(
+            transcript.len(),
+            2,
+            "the empty message is kept for diagnosis"
+        );
+        assert_eq!(transcript[1].role, Role::Assistant);
+        assert_eq!(transcript[1].text(), blank);
+    }
+}
+
+#[test]
+fn a_non_empty_final_message_and_tool_call_messages_are_unaffected() {
+    // Non-empty text completes as before.
+    let mut model = FakeModel::new(vec![Message::assistant_text("done.")]);
+    let mut tools = echo_registry();
+    let mut transcript = Vec::new();
+    let outcome = agent(3)
+        .run(&mut model, &mut tools, &mut AllowAll, &mut transcript, "go")
+        .unwrap();
+    assert_eq!(outcome.final_text, "done.");
+
+    // A message with tool calls and no text is a normal tool turn, not an
+    // empty response.
+    let mut model = FakeModel::new(vec![
+        assistant_calls(vec![tool_call("c", "echo", json!({ "n": 1 }))]),
+        Message::assistant_text("after the call"),
+    ]);
+    let mut tools = echo_registry();
+    let mut transcript = Vec::new();
+    let outcome = agent(3)
+        .run(&mut model, &mut tools, &mut AllowAll, &mut transcript, "go")
+        .unwrap();
+    assert_eq!(outcome.final_text, "after the call");
+    assert_eq!(outcome.turns, 2);
+}

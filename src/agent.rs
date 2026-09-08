@@ -69,6 +69,11 @@ pub enum LoopError {
     MaxTurnsExceeded {
         max_turns: usize,
     },
+    /// The model returned neither tool calls nor visible text (PLAN.md §8
+    /// T19). Three of four L1 runs ended this way and were shown to the
+    /// user as a blank final answer. The empty message stays in the
+    /// transcript for diagnosis; nothing is retried or invented.
+    EmptyAssistantResponse,
     Model(ModelError),
 }
 
@@ -78,6 +83,10 @@ impl fmt::Display for LoopError {
             LoopError::MaxTurnsExceeded { max_turns } => {
                 write!(f, "agent loop exceeded max_turns = {max_turns}")
             }
+            LoopError::EmptyAssistantResponse => write!(
+                f,
+                "the model returned an empty response (no tool calls and no text)"
+            ),
             LoopError::Model(error) => write!(f, "{error}"),
         }
     }
@@ -90,7 +99,8 @@ impl AgentLoop {
     /// final answer, appending every message produced along the way.
     ///
     /// Each turn: call the model; if it made no tool calls, its text is the
-    /// final answer. Otherwise, for every tool call in declaration order:
+    /// final answer, unless that text is blank, which is an error
+    /// (`EmptyAssistantResponse`). Otherwise, for every tool call in declaration order:
     /// a call to a tool that does not exist becomes an error observation
     /// without consulting the hooks; any other call is decided by the hooks
     /// and executed when allowed. All observations return in one message and
@@ -121,6 +131,11 @@ impl AgentLoop {
             hooks.on_message(transcript.last().expect("just pushed"));
 
             if calls.is_empty() {
+                // Appended and reported to the hooks above, so the log keeps
+                // the empty message; whitespace is not a final answer.
+                if reply_text.trim().is_empty() {
+                    return Err(LoopError::EmptyAssistantResponse);
+                }
                 return Ok(RunOutcome {
                     final_text: reply_text,
                     turns: turn,
