@@ -1,6 +1,11 @@
 # Exact-replace editing: Gate D
 
-Status: **Gate D prepared, not yet run (2026-09-08).** No Keel code changes.
+Status: **Gate D run 2026-09-08: `replacement_produces_expected_file` 10/10;
+all seven metrics 10/10 (no L1-style collapse 0/10).** Under the
+pre-registered rule this makes exact-replace editing a credible candidate:
+the minimal design is written for review in `docs/DESIGN_EDIT_FILE.md`;
+nothing is implemented. Evidence: `docs/evidence/EDIT_FILE_GATE_D_2026-09-08.md`.
+No Keel code changes.
 
 ## Where this comes from
 
@@ -116,6 +121,18 @@ Report `scores.txt` in full (per row: `finish`, `usage`, `reasoning_chars`,
 `content_text`, `old_text_occurrences`, byte counts; for any non-passing
 row the 300-char `arguments_prefix` and the short diff of produced versus
 expected). Keep the raw responses.
+
+### Result (2026-09-08)
+
+```text
+valid_edit_file_call 10/10   path_exact 10/10   old_text_byte_exact 10/10   new_text_byte_exact 10/10
+old_text_unique_in_seed 10/10   replacement_produces_expected_file 10/10 (gate metric)   looks_like_l1_collapse 0/10
+```
+
+All ten responses: one call, `finish = tool_calls`, empty visible content,
+`old_text` 681 bytes and `new_text` 1,074 bytes byte-exact, completion 517
+to 2,094 tokens. Under `9–10/10 → write a minimal design for review; do not
+implement yet`, the design is `docs/DESIGN_EDIT_FILE.md`.
 
 ## If Gate D passes: what the design review must resolve
 
