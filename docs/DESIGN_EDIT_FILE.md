@@ -5,7 +5,8 @@ decisions: `new_text` may be empty; no `intent` field; the tool wording says
 relative paths resolve against the workspace root and outside-workspace paths
 require host approval, matching the runtime). Gate D passed 10/10
 (`docs/evidence/EDIT_FILE_GATE_D_2026-09-08.md`). The alternatives stopped
-under their own gates are not revisited here. Regression L1-R1 pending.
+under their own gates are not revisited here. Regression L1-R1 passed 7/7
+(`docs/evidence/L1R1_2026-09-08.md`).
 
 ## Problem this answers
 
