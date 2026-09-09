@@ -68,7 +68,10 @@ M0–M3 done; T15 closed. Current phase: long-horizon dogfooding
 to `edit_file` (`docs/DESIGN_EDIT_FILE.md`); the L1-R1 rerun with only that
 tool added passed 7/7, and L1-R2 in full mode passed 7/7 with zero host
 prompts and every state-changing action preceded by the model's announced
-review (`docs/evidence/L1R1_2026-09-08.md`, `L1R2_2026-09-08.md`). The L1
+review (`docs/evidence/L1R1_2026-09-08.md`, `L1R2_2026-09-08.md`). L2, a harder
+maintenance task on a second repository, passed 13/13 in full mode with all
+seed tests preserved; its dominant friction was the default 32-call fuse
+(`docs/evidence/L2_2026-09-09.md`). The L1
 investigation is closed; an empty model response is now an explicit loop
 error, and the shell description states that Keel does the `pira_ctx`
 wrapping. Done so far:

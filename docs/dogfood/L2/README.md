@@ -1,9 +1,10 @@
 # L2: a harder coding-maintenance workload (`queuewatch`)
 
-Status: **reviewed 2026-09-09, conditionally approved; the two required
-corrections are applied (retry duration reset made an observable contract in
-the task and A03; run baseline frozen below). Approved for one run under this
-protocol.** Keel is unchanged; no model has been called for L2.
+Status: **run 2026-09-09: passed, acceptance 13/13, seed tests 42/42
+preserved (12 added), handshake 16/16, host approvals 0. Dominant friction:
+the default `max_turns = 32` fuse blew twice; completion depended on 2 of 3
+`Continue` messages** (`docs/evidence/L2_2026-09-09.md`). Keel unchanged;
+work stopped for review.
 
 ## Purpose
 
