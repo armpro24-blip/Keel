@@ -10,6 +10,14 @@
 # Output is meant to be pasted into docs/evidence/TOOL_PROTOCOL_AUDIT_<date>.md
 # (step 1b and step 3). Long source excerpts are bounded; widen the ranges by
 # hand if a decisive function is cut.
+#
+# Written before the installed layout was known. vLLM 0.26.0 does not have
+# entrypoints/openai/tool_parsers/, reasoning/qwen3_reasoning_parser.py or
+# serving_chat.py; its Qwen3 machinery is parser/qwen3.py, parser/engine/*,
+# and entrypoints/openai/chat_completion/serving.py. For 0.26.0 use the
+# probes the lab ran instead: ../audit_2026-09-09/probes/ (step1b.sh,
+# step1b_fix.sh, probe4.sh .. probe7.sh). The step-1b section below still
+# works on any version; the step-3 greps print nothing on 0.26.0.
 set -u
 PY="${1:-python}"
 

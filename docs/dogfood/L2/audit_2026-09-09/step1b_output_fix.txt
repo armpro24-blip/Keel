@@ -1,0 +1,97 @@
+served model (positional argv after 'serve'): nvidia/Qwen3.6-35B-A3B-NVFP4
+hub dir: /root/.cache/huggingface/hub/models--nvidia--Qwen3.6-35B-A3B-NVFP4
+
+--- refs (which snapshot is current)
+main -> 1355db6a052410cfd62085d94b58866fd0f2c3c5
+--- all snapshots present
+1355db6a052410cfd62085d94b58866fd0f2c3c5
+491c2f1ea524c639598bf8fa787a93fed5a6fbce
+using: /root/.cache/huggingface/hub/models--nvidia--Qwen3.6-35B-A3B-NVFP4/snapshots/1355db6a052410cfd62085d94b58866fd0f2c3c5
+
+--- sha256 (served snapshot)
+e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259  chat_template.jinja
+e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e  generation_config.json
+58aefa1c9eff7989f431d748f2ddec39446cb1fd2a69acc46e285c6a37b0cecc  config.json
+5186f0defcd7f232382c7f0aebcd2252d073bb921ab240e407b7ae8745d2b29b  tokenizer_config.json
+
+--- generation_config.json
+{
+    "bos_token_id": 248044,
+    "do_sample": true,
+    "eos_token_id": [
+        248046,
+        248044
+    ],
+    "pad_token_id": 248044,
+    "temperature": 1.0,
+    "top_k": 20,
+    "top_p": 0.95
+}
+
+--- chat_template.jinja: size, and every line mentioning think / tool_call / function / parameter (cut to 160 cols)
+7764 /root/.cache/huggingface/hub/models--nvidia--Qwen3.6-35B-A3B-NVFP4/snapshots/1355db6a052410cfd62085d94b58866fd0f2c3c5/chat_template.jinja
+53:    {{- '\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter
+94:            {%- if '</think>' in content %}
+95:                {%- set reasoning_content = content.split('</think>')[0].rstrip('\n').split('<think>')[-1].lstrip('\n') %}
+96:                {%- set content = content.split('</think>')[-1].lstrip('\n') %}
+100:        {%- if (preserve_thinking is defined and preserve_thinking is true) or (loop.index0 > ns.last_query_index) %}
+101:            {{- '<|im_start|>' + message.role + '\n<think>\n' + reasoning_content + '\n</think>\n\n' + content }}
+105:        {%- if message.tool_calls and message.tool_calls is iterable and message.tool_calls is not mapping %}
+106:            {%- for tool_call in message.tool_calls %}
+107:                {%- if tool_call.function is defined %}
+108:                    {%- set tool_call = tool_call.function %}
+112:                        {{- '\n\n<tool_call>\n<function=' + tool_call.name + '>\n' }}
+114:                        {{- '<tool_call>\n<function=' + tool_call.name + '>\n' }}
+117:                    {{- '\n<tool_call>\n<function=' + tool_call.name + '>\n' }}
+119:                {%- if tool_call.arguments is defined %}
+120:                    {%- for args_name, args_value in tool_call.arguments|items %}
+121:                        {{- '<parameter=' + args_name + '>\n' }}
+127:                {{- '</function>\n</tool_call>' }}
+149:    {%- if enable_thinking is defined and enable_thinking is false %}
+150:        {{- '<think>\n\n</think>\n\n' }}
+152:        {{- '<think>\n' }}
+
+--- chat_template.jinja: the generation-prompt tail (last 25 lines)
+        {{- '<|im_end|>\n' }}
+    {%- elif message.role == "tool" %}
+        {%- if loop.previtem and loop.previtem.role != "tool" %}
+            {{- '<|im_start|>user' }}
+        {%- endif %}
+        {{- '\n<tool_response>\n' }}
+        {{- content }}
+        {{- '\n</tool_response>' }}
+        {%- if not loop.last and loop.nextitem.role != "tool" %}
+            {{- '<|im_end|>\n' }}
+        {%- elif loop.last %}
+            {{- '<|im_end|>\n' }}
+        {%- endif %}
+    {%- else %}
+        {{- raise_exception('Unexpected message role.') }}
+    {%- endif %}
+{%- endfor %}
+{%- if add_generation_prompt %}
+    {{- '<|im_start|>assistant\n' }}
+    {%- if enable_thinking is defined and enable_thinking is false %}
+        {{- '<think>\n\n</think>\n\n' }}
+    {%- else %}
+        {{- '<think>\n' }}
+    {%- endif %}
+{%- endif %}
+
+--- tokenizer_config.json: special/added tokens relevant to the parser
+chat_template embedded in tokenizer_config: True
+eos_token: '<|im_end|>'
+pad_token: '<|endoftext|>'
+bos_token: None
+added_tokens_decoder: 33 total; relevant:
+   248045  special=True   '<|im_start|>'
+   248046  special=True   '<|im_end|>'
+   248058  special=False  '<tool_call>'
+   248059  special=False  '</tool_call>'
+   248066  special=False  '<tool_response>'
+   248067  special=False  '</tool_response>'
+   248068  special=False  '<think>'
+   248069  special=False  '</think>'
+
+--- config.json: architecture / eos
+{'architectures': ['Qwen3_5MoeForConditionalGeneration'], 'model_type': 'qwen3_5_moe', 'quantization_config': {'config_groups': {'group_0': {'input_activations': {'dynamic': False, 'num_bits': 8, 'type': 'float'}, 'weights': {'dynamic': False, 'num_bits': 8, 'type': 'float'}, 'targets': ['model.language_model.layers.0.linear_attn.in_proj_qkv', 'model.language_model.layers.0.linear_attn.in_proj_z',

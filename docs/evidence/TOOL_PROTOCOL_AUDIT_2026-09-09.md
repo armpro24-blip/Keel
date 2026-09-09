@@ -1,10 +1,13 @@
 # Tool-protocol audit after L2-R1 (2026-09-09)
 
 Protocol: `docs/dogfood/L2/TOOL_PROTOCOL_AUDIT.md`. Static, read-only
-steps only; no model run, no Keel or PIRA change. Reported by the user; the
-script outputs are verbatim. Where a step could not be completed on the lab
-machine, that is stated and the exact remote command that would complete it
-is recorded.
+steps only; no model run, no Keel or PIRA change. Steps 1a and 2 were run on
+the Keel host and reported by the user; steps 1b and 3 were run by the lab
+operator inside the vLLM container on the serving host and delivered as a
+pack, stored verbatim in `docs/dogfood/L2/audit_2026-09-09/` (conclusion
+document, probe outputs, probe scripts). This report is the Keel author's
+reading of all of it; where a claim rests on the lab's source read that the
+author could not repeat, that is stated.
 
 ## Summary
 
@@ -14,19 +17,25 @@ share one structural signature: `finish_reason: stop`, `tool_calls: 0`,
 (`</tool_call>` once, `</parameter>`, in L1 also `<parameter=…>` names) but
 **no opening** `<tool_call>` or `<function=…>` and no `</think>`. Across all
 77 responses of the two sessions, tool-call markup appears in reasoning in
-exactly these 4, and in exactly these 4 no call was extracted; every one of
-the other 73 responses had clean reasoning and extracted calls (including
-multi-call turns and an 18,469-character reasoning). The common-cause
-hypothesis from L2-R1 is therefore supported by structure. Classification
-within the three offered: **model output non-compliant with the template
-(the call emitted while the thinking channel was still open) as the primary
-cause**, with one secondary observation to be confirmed on the serving host:
-the server answered such output with a silent "success" (`stop`, empty
-content, no calls) rather than any error or degradation. Whether that is a
-parser design choice or a defect needs the installed parser source, which is
-on another host and was not readable from the lab machine.
+exactly these 4 plus one successful control (L1 call 36: a stray
+`</parameter>` and a fabricated `</thinking>`, followed by a complete call),
+and in exactly the 4 no call was extracted.
 
-## Step 1: serving configuration (partly unavailable)
+Final classification, within the three offered by the protocol:
+**model output non-compliant with the template.** Configuration mismatch is
+excluded (step 1b: the deployment runs the parsers the model card prescribes
+on the weights' own template). Parser implementation defect is excluded
+(step 3: the non-streaming path scans the whole generated text in one pass
+from the REASONING state, the reasoning→tool transition is reachable, and
+every no-transition path preserves the matched text, so a tag absent from
+the reasoning text was never generated). The server's "silent success" is
+therefore the designed outcome for text that never opened a tool block, not
+a lost call. Keel's behavior was correct throughout; no Keel change follows
+from this audit.
+
+## Step 1: serving configuration
+
+### 1a, from the Keel host over HTTP
 
 Available over HTTP:
 
@@ -39,22 +48,18 @@ $ curl -s -H "Authorization: Bearer dummy" http://192.168.3.103:8000/v1/models
 "root":"nvidia/Qwen3.6-35B-A3B-NVFP4","parent":null,"max_model_len":262144,"permission":[…]}]}
 ```
 
-Unavailable, and why: vLLM runs on another host (`192.168.3.103`; the lab
-machine's addresses are `141.41.42.57`, `192.168.3.182`, `172.31.208.1`).
-The process listing on the lab machine matched only the PowerShell command
-itself. Therefore the literal `--tool-call-parser`, `--reasoning-parser`,
-`--enable-auto-tool-choice`, `--chat-template` values, the model revision,
-the weights' `config.json` / `generation_config.json` / template hashes, the
-default `max_tokens`, and stop settings could not be recorded. `/server_info`
-and `/config` return 404 on 0.26.0.
+Not available over HTTP: vLLM runs on another host (`192.168.3.103`; the
+lab machine's addresses are `141.41.42.57`, `192.168.3.182`, `172.31.208.1`),
+and `/server_info` and `/config` return 404 on 0.26.0. Everything the HTTP
+side could not give is in 1b below.
 
-Equivalent facts derived from the interface (each with its basis):
+Facts derived from the interface (each with its basis):
 
 | Item | Value | Basis |
 |---|---|---|
 | vLLM | 0.26.0 | `/version` |
 | model id / root | `nvidia/Qwen3.6-35B-A3B-NVFP4` | `/v1/models` |
-| revision / weight hashes | unavailable | remote host |
+| revision / weight hashes | see 1b | remote host |
 | `max_model_len` | 262144 | `/v1/models` |
 | tool-call format | XML style `<tool_call><function=NAME><parameter=NAME>…</parameter></function></tool_call>` | template rendered via `/tokenize` + `/detokenize` (below) |
 | template's tool instructions | include "If you choose to call a function ONLY reply in the following format with NO suffix" and an `<IMPORTANT>` block | same |
@@ -62,7 +67,7 @@ Equivalent facts derived from the interface (each with its basis):
 | assistant history turns rendered as | `<think>\n\n</think>\n\n<tool_call>…` | same |
 | auto tool choice | enabled | behavior: tool calls parsed normally in 10 gate runs and 4 dogfood sessions |
 | reasoning parser | enabled | behavior: responses carry a non-empty `reasoning` field |
-| default `max_tokens` / stop settings | unavailable | remote host |
+| default `max_tokens` / stop settings | see 1b | remote host |
 | KV / prefix cache | `enable_prefix_caching=True`, `cache_dtype=fp8`, `gpu_memory_utilization=0.4`, `block_size=2144` | `/metrics` `vllm:cache_config_info` |
 
 Rendered template excerpt (sha256
@@ -101,6 +106,39 @@ Reminder:
 <|im_start|>assistant
 <think>
 ```
+
+### 1b, on the serving host (lab operator, inside the vLLM container)
+
+Source: `docs/dogfood/L2/audit_2026-09-09/step1b_output.txt` (probe
+`probes/step1b.sh`) and `step1b_output_fix.txt` (probe `probes/step1b_fix.sh`,
+which corrects a defect of the first probe: the model is the positional
+argument of `vllm serve`, not `--model`, so the first probe's
+`generation_config.json` body and `<think>` check were read from a different
+model's snapshot and are superseded; its sha256 table was complete and
+correct). Both probes were read-only, streamed into `docker exec -i … bash -s`,
+wrote no file, changed no configuration, issued no inference. `HF_TOKEN` was
+redacted by the lab before handover.
+
+| Item | Value |
+|---|---|
+| image / build | `vllm/vllm-openai:v0.26.0` (tag `latest` on the host, digest `sha256:ffb2d59b…abf52`, created 2026-07-25); `VLLM_BUILD_COMMIT=ffd46bfab2128bb84146050e98b51a617c6575ab` |
+| installed vLLM | 0.26.0 at `/usr/local/lib/python3.12/dist-packages/vllm`; Python 3.12.13, torch 2.11.0+cu130, transformers 5.14.1 |
+| launch (PID 1) | `vllm serve nvidia/Qwen3.6-35B-A3B-NVFP4 --host 0.0.0.0 --port 8000 --tensor-parallel-size 1 --trust-remote-code --quantization modelopt --kv-cache-dtype fp8 --attention-backend flashinfer --gpu-memory-utilization 0.4 --max-model-len 262144 --max-num-seqs 4 --max-num-batched-tokens 8192 --enable-chunked-prefill --async-scheduling --enable-prefix-caching --speculative-config {"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"} --load-format fastsafetensors --reasoning-parser qwen3 --tool-call-parser qwen3_xml --enable-auto-tool-choice` |
+| `--reasoning-parser` / `--tool-call-parser` | `qwen3` / `qwen3_xml`; `--enable-auto-tool-choice` set; no `--chat-template` (template taken from the weights) |
+| `qwen3_xml` registry | `<vllm>/tool_parsers/__init__.py:161` maps it to `qwen3_engine_tool_parser`; the state machine is `<vllm>/parser/qwen3.py` |
+| model snapshot | `nvidia/Qwen3.6-35B-A3B-NVFP4 @ 1355db6a052410cfd62085d94b58866fd0f2c3c5` (`refs/main`); a second snapshot `491c2f1e…` holds byte-identical copies of the four files below |
+| `chat_template.jinja` | sha256 `e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259`, 7,764 bytes; line 53 carries the tool-format instruction; line 152 ends the generation prompt with `<think>\n` unless `enable_thinking` is false (thinking on by default) |
+| `generation_config.json` | sha256 `e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e`: `do_sample: true`, `temperature: 1.0`, `top_k: 20`, `top_p: 0.95`, eos `[248046, 248044]` |
+| `config.json` / `tokenizer_config.json` | sha256 `58aefa1c…0cecc` / `5186f0de…b29b`; architecture `Qwen3_5MoeForConditionalGeneration` |
+| protocol tokens | `<tool_call>` 248058, `</tool_call>` 248059, `<think>` 248068, `</think>` 248069, all `special=False`; `<|im_start|>` 248045 and `<|im_end|>` 248046 are `special=True` |
+| default `max_tokens` / stop | not set on the command line (vLLM defaults; the model's eos list above) |
+
+Two consequences for the sessions under audit. First, Keel sends no sampling
+parameters, so every Keel run so far (gates, L1, L1-R1, L1-R2, L2, L2-R1)
+decoded with the model's shipped defaults, temperature 1.0 / top_k 20 /
+top_p 0.95. Second, the four protocol tokens are non-special, so
+`skip_special_tokens` cannot remove them at detokenization; an opening
+`<tool_call>` the model emitted would reach the parser as text.
 
 ## Step 2: structured audit of both wires (`audit_tool_protocol.py`)
 
@@ -243,82 +281,215 @@ next edit in the same repair thread. The L2-R1 report's phrase "the resend
 of the edit_file just denied" is corrected to "the next edit attempted after
 the denial".
 
-## Step 3: installed-source comparison (not executable from the lab machine)
+## Step 3: installed-source comparison (lab operator, on the serving host)
 
-`import vllm` fails and no vLLM source tree exists on the lab machine
-(`192.168.3.182`); the installed 0.26.0 lives on `192.168.3.103`. An SSH
-attempt from the Keel session toward that host was stopped by the permission
-policy as cross-host remote execution needing separate authorization (port
-22 open, key in `known_hosts`, `~/.ssh/config` user `infolabor`: the
-channel itself works). File paths and line ranges therefore could not be
-cited. The step is completed by running
-`docs/dogfood/L2/tools/serving_host_probe.sh` **on the serving host itself**
-(if the host named `spark-a4b3` is that machine, run it there directly);
-equivalent manual commands:
+Source: `docs/dogfood/L2/audit_2026-09-09/tool_protocol_audit_step3.md`
+(the lab's conclusion document, Chinese, with two appendices: the
+intermediate hypotheses that were refuted, and how the evidence was
+collected), obtained with the read-only probes `probes/probe4.sh` …
+`probe7.sh` and the line-number section of `probes/step1b.sh`. The Keel
+author has not read the vLLM source; what follows is the lab's reading, then
+the author's consistency check of it against the outputs that are in the
+pack.
 
-```bash
-python -c "import vllm, os; print(vllm.__version__, os.path.dirname(vllm.__file__))"
-ps -ef | grep vllm            # --tool-call-parser / --reasoning-parser / --chat-template / --enable-auto-tool-choice
-sed -n '1,200p' <vllm>/entrypoints/openai/tool_parsers/qwen3xml_tool_parser.py      # or the parser actually enabled
-sed -n '1,200p' <vllm>/reasoning/qwen3_reasoning_parser.py                           # or the parser actually enabled
-grep -rn "tool_call" <vllm>/entrypoints/openai/serving_chat.py | head -40
-```
+### The two preregistered questions
 
-The decisive question for that read: does the enabled tool parser's
-`extract_tool_calls` receive the full generated text or only the text left
-after the reasoning parser has removed the thinking segment? And where did
-the opening `<tool_call>` / `<function=…>` tags go: never emitted by the
-model, or consumed by a parser stage without producing a call?
+**Does the tool parser receive the full generated text, or only the content
+left after the reasoning parser removed the thinking segment?** The full
+text. Non-streaming path: `chat_completion_full_generator`
+(`<vllm>/entrypoints/openai/chat_completion/serving.py:836`) calls
+`parser.parse(output.text, request, enable_auto_tools=…,
+model_output_token_ids=token_ids)` at lines 893–898, the only extraction
+entry on that path. `ParserEngine.parse` (`parser/engine/parser_engine.py:677`)
+calls `_check_skip_tool_parsing` and then `_single_pass_parse` (line 645)
+without an `initial_state`, so `_reset()` takes the configured initial state,
+which for `qwen3.py:100` is `ParserState.REASONING` when thinking is on. One
+state machine scans the whole text once. The two-stage route
+(`extract_reasoning` at 490 stripping the think segment, then
+`extract_tool_calls_from_content` at 553 starting in `CONTENT`) exists for
+`ParserEngineToolAdapter` and is not on this path.
 
-## Classification
+**Where did the opening tags go: consumed by a stage without producing a
+call, or never emitted?** Never emitted. `(ParserState.REASONING,
+"TOOL_START") → TOOL_PREAMBLE` emitting `(REASONING_END, TOOL_CALL_START)`
+is defined at `qwen3.py:137-140` (comment at 136: "Tool call directly from
+reasoning (implicit end)") and is live on this path: `skip_tool_parsing` is
+set only by the context manager at `adapters.py:52-58`, used at three places
+inside the reasoning adapter and nowhere on the `parse()` route;
+`_suppress_tool_calls` (`parser_engine.py:125`) is set only when
+`tool_choice == "none" and tools` (lines 410–411), which Keel never sends.
+
+### Why a parser defect is excluded (three independent arguments)
+
+1. **Unmatched terminal text is always preserved.** `_on_terminal`
+   (`streaming_parser_engine.py:302-352`) has three no-transition exits
+   (`transition is None`; the `skip_tool_parsing` branch; `skip_in_token_id_mode
+   and _ever_had_token_ids`), all ending in `_emit_for_state(value)`, which
+   re-emits the matched text under the current state. The only silent drop is
+   `DROP_TERMINAL`, which requires `transition is None` and the terminal name
+   `DROP`. The token-id strict dispatch at 285–291 routes to `_on_content`,
+   which also preserves text. Hence a tag missing from the reasoning text was
+   never in `output.text`; with the non-special token ids of 1b, it was never
+   generated.
+2. **A tool slot is created only by `TOOL_CALL_START`.** `_events_to_delta`
+   (706–785) calls `_ensure_slot` on that event; `_build_extracted_result`
+   (1011–1060) skips slots with neither name nor args and sets `tools_called =
+   len(tool_calls) > 0`. Four responses with `tool_calls: 0` and empty content
+   mean no slot ever got a name or argument, so `TOOL_CALL_START` never fired,
+   so `(REASONING, "TOOL_START")` never matched.
+3. **Counterfactual.** Had `<function=NAME><parameter=KEY>` been consumed by
+   a transition, the following text would have reached `slot.args` as
+   `ARG_VALUE_CHUNK` and `slot.name` would be set; `tools_called` would be
+   true and the text would sit in `content`, not `reasoning`. Observed: false,
+   and the text is in `reasoning`. The machine stayed in `REASONING` from
+   start to end.
+
+### What the model actually emitted
+
+The four failing reasonings end with the **suffix** of a tool-call block;
+the block's first three markers (`<tool_call>`, `<function=NAME>`, the first
+`<parameter=KEY>`) are missing. L1 call 18 (lab numbering 17), 763
+characters, has the skeleton
+`[458 chars of prose] </parameter> <parameter=intent>…</parameter> <parameter=effect>…</parameter> <parameter=safety_review>…</parameter> </function> </tool_call>`;
+the 458 leading characters are the model's deliberation about the shell tool
+rejecting long or heavily quoted commands, not a parameter value. The model
+closed a parameter it never opened and then wrote three more parameters and
+the block's tail.
+
+Control: L1 call 36 (lab 35), same session, model, and parsers,
+`finish_reason: tool_calls`, one call extracted. Its reasoning ends
+`…approach.\n</parameter>\n</thinking>\n\nLet me try piping Python code into the interpreter:\n\n`,
+a stray `</parameter>` plus a fabricated `</thinking>` that is not in the
+Qwen3 terminal table at all (`<think>`/`</think>` are). It then wrote a
+complete `<tool_call>` block, which the transition consumed and extracted
+normally; its opening tag is absent from the reasoning for that reason. The
+same tag disorder succeeds when the block is written in full and fails when
+its head is dropped. At every tag level in the four failures the opening
+count is exactly one below the closing count, and the gap is a contiguous
+prefix of the block.
+
+Lab's signature table (lab numbering; see the numbering note in step 2):
+
+| wire | response | reasoning chars | `<tool_call>`/`</tool_call>` | `<function=`/`</function>` | `<parameter=`/`</parameter>` |
+|---|---|---|---|---|---|
+| L1 | 17 (script 18) | 763 | 0 / 1 | 0 / 1 | 3 / 4 |
+| L1 | 25 (script 26) | 811 | 0 / 1 | 0 / 1 | 1 / 2 |
+| L1 | 37 (script 38) | 913 | 0 / 1 | 0 / 1 | 1 / 2 |
+| L2-R1 | 40 | 9,967 | 0 / 1 | 0 / 1 | 0 / 1 |
+| L1 | 35 (script 36), control | 734 | 0 / 0 | 0 / 0 | 0 / 1 |
+
+Of 77 responses, 5 carry any tool markup in reasoning (these five); 72 carry
+none.
+
+Trigger context, lab reading: all four came during stretches in which the
+model was repeatedly rebuffed (shell rejecting long or heavily quoted
+commands in L1; the denied review-less edit in L2-R1) and was cycling
+through alternative phrasings. The control call 36 sat in the same L1
+stretch. The lab connects this to the Gate D/L1-R1 line: lowering the
+structural complexity the model must hold correct in one output lowered the
+failure rate. That is an observation about co-occurrence, not a measured
+rate.
+
+### Refuted intermediate hypotheses (lab appendix A, kept as preregistered)
+
+- *Two-adapter, two-stage path makes the call unextractable* (reasoning
+  adapter consumes the opening tag under `skip_tool_parsing=True`, tool
+  adapter then starts in `CONTENT` on stripped text). Refuted: no
+  `extract_tool_calls` call exists in `chat_completion/serving.py`; the
+  non-streaming path calls `parser.parse()`.
+- *Parser consumed the block prefix and then abandoned the call*, inferred
+  from "exactly a contiguous prefix is missing". Refuted: all no-transition
+  exits of `_on_terminal` preserve text, and no `TOOL_CALL_START` was emitted;
+  reading the reasoning body confirmed the 458 characters are prose, not an
+  argument value.
+
+### Keel author's consistency check
+
+What could be verified from the pack itself:
+
+- Every `def` line number the lab cites for `parser_engine.py` (217, 401,
+  490, 553, 645, 677, 706, 786, 1011), `streaming_parser_engine.py` (302,
+  354, 370, 375), `qwen3.py` (100, 101, 114, 120, 136–140) and the
+  `parser.parse` call site (`serving.py:893-898`) matches the `grep -n` /
+  `sed -n` output in section 4 of `step1b_output.txt`. Line numbers for
+  `serving.py:836`, `:153`, `:264-266`, `adapters.py:52-58/74/86/114`,
+  `parser_engine.py:125/166-171/408-412/719` and the `_on_terminal` interior
+  ranges come from probe outputs the lab did not include in the pack; they
+  are taken on the lab's word.
+- The lab's per-response figures agree with the Keel-side script in step 2
+  under the numbering mapping: reasoning lengths 763/811/913/9,967 and 734
+  for the control; `</tool_call>` = 1 and `<tool_call>` = 0 in all four;
+  `<parameter=` counts 3/1/1/0 equal the script's parameter-name lists.
+- Launch arguments, snapshot, hashes, sampling defaults and token ids are
+  read directly from the two probe outputs, not from the conclusion document.
+- The three exclusion arguments are consistent with each other and with the
+  control: argument 1 predicts that a consumed `<tool_call>` disappears from
+  reasoning while an unconsumed one stays; the control shows the former, the
+  four failures show neither, which is only possible if the tag was absent.
+
+What could not be verified: the source text itself, and therefore whether
+some path the lab did not read could drop text. The lab's reading covered
+the whole of `_on_terminal`, the dispatch above it, `_emit_for_state`,
+`_on_content`, `_apply_transition`, `parse`, `_single_pass_parse`,
+`_events_to_delta`, `_ensure_slot`, `_build_extracted_result`, and the
+`qwen3.py` tables; `incremental_lexer.py` was read for structure only. The
+residual is a lexer-level drop in a file read for structure, which the
+control's preserved stray `</parameter>` and `</thinking>` argue against
+but do not close.
+
+## Classification (final)
 
 Within the three categories of the protocol:
 
-**Primary: model output non-compliant with the template.** The template
-opens `<think>` for the model; the model must emit `</think>` to leave the
-thinking channel and must then emit the call in the prescribed format, with
-reasoning "BEFORE the function call, but NOT after". In the four failing
-responses no `</think>` appears anywhere while tool-call closing markup does,
-so the call was begun inside the still-open thinking channel. Not a length or
+**Model output non-compliant with the template.** The template opens
+`<think>` for the model; the model must emit `</think>` to leave the
+thinking channel and then the call in the prescribed format, with reasoning
+"BEFORE the function call, but NOT after". In the four failing responses no
+`</think>` appears while tool-call closing markup does, and step 3 shows the
+opening markup was never generated: the model wrote the tail of a call
+inside the still-open thinking channel and stopped. Not a length or
 truncation effect: call 40 used 3,298 completion tokens against 8,742 for
-call 31 (which produced a valid call after 18,469 characters of reasoning);
-totals ~39.3k against 262,144. Not a configuration mismatch in the ordinary
-sense: the same template and parsers handled the other 73 responses of these
-two sessions, multi-call turns included, and Gate D 10/10 under the same
-configuration. Context of all four: each came immediately after a rejection
-or repair setback (L2-R1: an `edit_file` denied for a missing review; L1:
-repeated failed attempts to write a patch script), during protracted work on
-one sub-problem. Four of 77 responses in these two sessions; that is an
-observed count, not a rate estimate.
+call 31 (a valid call after 18,469 characters of reasoning); totals ~39.3k
+against 262,144. Four of 77 responses in these two sessions; that is an
+observed count, not a rate estimate. All four followed a rejection or a run
+of failed attempts on one sub-problem.
 
-**Secondary, to be confirmed on the serving host:** the server returned the
-non-compliant output as a normal completion (`finish_reason: stop`, empty
-content, no calls) rather than an error or a degraded signal. Whether the
-tool parser only scans content after reasoning removal (a design choice that
-makes this outcome expected) or should have recovered the block (a defect)
-decides how much of the failure is booked to the parser. The absence of the
-opening tags from the reasoning text is the specific open question.
+**Configuration mismatch: excluded.** The deployment uses the weights' own
+template (sha256 recorded), `--reasoning-parser qwen3`,
+`--tool-call-parser qwen3_xml`, `--enable-auto-tool-choice`, thinking on by
+default; the same configuration extracted the other 73 responses of these
+sessions, multi-call turns included, and Gate D 10/10.
 
-**Not Keel's.** Keel denied the review-less edit, received a response with no
-tool calls and no text, reported it, kept the transcript, and resent nothing.
-Keel continues to execute only formal `tool_calls`; nothing in reasoning is
-promoted to an action. Diagnostic visibility (the response does carry the
-distinguishing markup) and execution recovery remain two different questions,
-and neither mechanism is requested by this audit.
+**Parser implementation defect: excluded.** The output was not compliant,
+so "compliant output, wrong extraction" does not apply; and the source read
+shows the parser could not have consumed an opening tag without producing a
+call. The earlier "secondary observation" (silent success instead of an
+error) is resolved as designed behavior: text that never opens a tool block
+is reasoning, and reasoning ending at eos is a normal `stop`. Whether vLLM
+*should* flag closing-only markup is a question for vLLM, not evidence of a
+defect in what it does.
 
-## What remains open, and the next static step
+**Not Keel's.** Keel denied the review-less edit, received a response with
+no tool calls and no text, reported it, kept the transcript, and resent
+nothing. Keel continues to execute only formal `tool_calls`; nothing in
+reasoning is promoted to an action.
 
-1. The read-only source read on the serving host (step 3, via
-   `serving_host_probe.sh`). It settles the secondary observation and the
-   fate of the opening tags. It requires no model run and no configuration
-   change, but it does require authorized access to `192.168.3.103`, which
-   is the reviewer's decision, not something the Keel session initiates. The
-   decisive reading: if `serving_chat.py` first strips the thinking segment
-   and hands only the remaining content to `extract_tool_calls`, then a call
-   written inside an unclosed think block is structurally unextractable and
-   the four empty responses are the necessary outcome of the model's output,
-   not a parser accident.
-2. Only if that read cannot discriminate, the pre-registered minimal probe
-   of the protocol's step 4, submitted for approval first.
+## What remains open
 
-L2-R2 stays unapproved; the L2-R1 result (10/13, incomplete) stands.
+1. **Recurrence risk is still unknown.** Four occurrences over two sessions
+   and 77 responses is a count, not a rate; the audit explains the mechanism
+   of each occurrence, not how often it will recur under the frozen L2 task.
+2. **A Keel-side mitigation was suggested by the lab and is not adopted
+   here.** Section 6 of the lab document, marked by the lab as outside the
+   audit's scope: detect the signature of step 3 (`stop`, no calls, empty
+   content, `</tool_call>` in reasoning without `<tool_call>`) and retry the
+   turn, without touching the model or vLLM. This conflicts with two standing
+   decisions (no automatic retry after an empty response, T19; Keel executes
+   only formal `tool_calls` and reads nothing from reasoning). It is recorded
+   in PLAN §8 as a pending review item for the user's decision; nothing is
+   implemented.
+3. Step 4 (the preregistered minimal probe) is not needed: steps 1–3
+   discriminated.
+
+L2-R2 stays unapproved; the L2-R1 result (10/13, incomplete) stands
+permanently regardless of any later run.

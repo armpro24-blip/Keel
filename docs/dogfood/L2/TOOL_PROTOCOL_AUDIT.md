@@ -1,11 +1,14 @@
 # Model/serving tool-protocol audit (after L2-R1)
 
-Status: **steps 1–3 run 2026-09-09 as far as the lab machine allows
-(`docs/evidence/TOOL_PROTOCOL_AUDIT_2026-09-09.md`): step 1 partial (vLLM is
-on another host), step 2 complete for both wires, step 3 not executable
-locally. Classification: model output non-compliant with the template
-(primary); parser's silent success to be confirmed by a read-only source
-read on the serving host. Step 4 not needed yet.** Keel, PIRA, and the frozen workloads are
+Status: **complete (2026-09-09, `docs/evidence/TOOL_PROTOCOL_AUDIT_2026-09-09.md`).**
+Steps 1a and 2 ran on the Keel host; steps 1b and 3 ran inside the vLLM
+container on the serving host, delivered by the lab as a verbatim pack in
+`audit_2026-09-09/` (conclusion document, probe outputs, probe scripts).
+Final classification: **model output non-compliant with the template**;
+configuration mismatch excluded; parser defect excluded (the non-streaming
+path scans the whole text in one pass from REASONING, and every
+no-transition path preserves the matched text, so the missing opening tags
+were never generated). Step 4 not needed. Keel, PIRA, and the frozen workloads are
 unchanged. Keel continues to execute only formal `tool_calls`; candidates,
 examples, or fragments found in reasoning are never promoted to actions.
 
@@ -46,7 +49,10 @@ from the Keel session. Run `docs/dogfood/L2/tools/serving_host_probe.sh`
 there (read-only: version and path of the installed vLLM, the server's
 launch arguments, parser modules present, template and generation-config
 hashes when the weights path is visible, and the source excerpts step 3
-needs).
+needs). That script was written before the 0.26.0 module layout was known;
+the probes the lab actually ran against 0.26.0 are `audit_2026-09-09/probes/`
+(`step1b.sh`, `step1b_fix.sh`, `probe4.sh`–`probe7.sh`) and supersede it for
+that version.
 
 Record: vLLM version; model id and revision (the `/v1/models` `root`, and
 the local weights directory's `config.json` / `generation_config.json`
