@@ -168,6 +168,15 @@ reasoning tail markup only: </parameter></function></tool_call>
 
 ### L1 (session `66a1592081861c8f`, three empty turns)
 
+Numbering note: `audit_tool_protocol.py` numbers every response event in
+the wire, including the `response_error` at position 3 (the provider
+timeout of run 1). Counted over successful assistant responses only, the
+same three empty turns are numbers 17, 25 and 37; the serving-host step-3
+document uses that convention. The two conventions name the same
+responses (script 18/26/38 = successful-response 17/25/37); L2-R1 had no
+error event, so its call 40 is 40 under both. This report keeps the
+script's numbering.
+
 ```text
 requests 38  responses 38
 call finish      calls content reasoning r<tc> r</tc> r<function> r<parameter> think(r/c) compl
