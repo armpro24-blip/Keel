@@ -1,9 +1,17 @@
 # Design: an explicit, finite model-call budget (T22)
 
-Status: **for review, not approved, not implemented** (2026-09-09). The
-alternatives set aside by the review are not revisited here: raising the
-default, automatic `Continue`, a progress classifier, compaction, unlimited
-runs, and coupling the budget to `full` mode.
+Status: **approved 2026-09-09 with three implementation constraints, and
+implemented**: (1) the range `1..=1000` stands, but 1000 is this version's
+conservative product ceiling, not a mathematical or model-capability
+boundary, and moving it needs independent evidence; (2) `run_end` carries
+`turns` on exhaustion, and `session_stats.py` distinguishes success from
+failure by `error`, sums calls separately, and reports an incomplete count
+rather than guessing when a failed run has no `turns`; (3) the value applies
+to the whole session while the count starts again with each user message;
+it is not a session-wide cumulative limit. The alternatives set aside by the
+review are not revisited here: raising the default, automatic `Continue`, a
+progress classifier, compaction, unlimited runs, and coupling the budget to
+`full` mode.
 
 ## Problem this answers
 
@@ -39,11 +47,11 @@ before the session starts.**
 | Aspect | Decision |
 |---|---|
 | Unit | model calls per user message, unchanged (the same quantity the fuse counts today; the log's `turns`) |
-| Scope | session-wide: one value for every run in the session, fixed at startup; no REPL command changes it mid-session, so the number in the log is the number that applied |
-| Legal values | an integer from 1 to 1000. No `0`, no `unlimited`, no negative. The upper bound is part of the design, not an implementation limit: a budget above 1000 calls for a single message is a request for unbounded operation, which this mechanism does not provide. (Reviewer may set a different bound; it must exist.) |
+| Scope | the configured value applies to the whole session and is fixed at startup (no REPL command changes it); the count starts again with each user message. It is not a cumulative limit across the session. |
+| Legal values | an integer from 1 to 1000. No `0`, no `unlimited`, no negative. 1000 is this version's conservative product ceiling, not a mathematical or model-capability boundary (1001 would still be finite); there is no unlimited setting, and a future change of the ceiling needs its own evidence. |
 | Interface | `--max-turns N` on the REPL command line; default 32 when absent. Malformed or out-of-range values are a usage error at startup (`--max-turns needs an integer from 1 to 1000`). No environment variable, no config file: one place. |
 | Visibility | the REPL prints `[max_turns] N per user message` at startup, unconditionally (not only under `--trace`), so the operator sees the bound that applies; the `session_start` event records `max_turns: N`. |
-| Exhaustion | unchanged in kind: `MaxTurnsExceeded`, transcript kept, run ends, no automatic `Continue`, no synthetic message. The REPL line names the fact and the state: `error: model-call budget exhausted (max_turns = N); the run is incomplete; the transcript is kept`. The `run_end` event carries `turns: N` alongside `error`, so the log states how many calls were actually made (today a failed run reports no count and `session_stats.py` cannot include it). |
+| Exhaustion | unchanged in kind: `MaxTurnsExceeded`, transcript kept, run ends, no automatic `Continue`, no synthetic message. The REPL line: `error: model-call budget exhausted (max_turns = N); the run is incomplete; the transcript is kept`. The `run_end` event carries `turns: N` alongside `error` (exactly N calls were made). Other failures (provider error, empty response) record no `turns`: the count is unknown there and is not filled with the budget. `session_stats.py` classifies runs by `error`, sums calls over runs that carry `turns`, and reports the total as incomplete when any run lacks one. |
 | Mode | independent of `ask`/`full`. Execution approval and resource authorization are different decisions; `--full` never changes the budget. |
 | Ownership | `cli` parses and validates; `main` passes the value to `AgentLoop.max_turns` and to the `session_start` event; `AgentLoop` enforces as today. No new type. |
 
@@ -63,12 +71,16 @@ changing what a turn counts, any change to tools, PIRA, or approval.
 
 ## Tests
 
-`cli`: `--max-turns 50` parsed; absent → 32; `0`, `-1`, `abc`, `1001`,
-missing value → usage error naming the range. `loop`: existing fuse tests
-unchanged (`max_turns` is already a field). `log`: `session_start` carries
-`max_turns`; a fused run's `run_end` carries `turns` equal to the budget and
-the error. REPL smoke: the startup line is printed with and without
-`--trace`. Existing 95 tests green; CI on both platforms.
+`cli`: absent → 32; `1`, `50`, `1000` parsed (range endpoints included);
+`0`, `1001`, `-1`, `abc`, empty, `32.0`, missing value → the usage error
+naming the range. `loop`: the existing fuse test also checks the exhaustion
+message. `session_stats.py`: a self-check (`test_session_stats.py`) with a
+mixed log (a completed run with `turns`, an exhausted run with `error` and
+`turns`, an old-style failed run with `error` only) must report 3 runs,
+1 completed, 2 failed, and an incomplete call count. `session_start` with
+`max_turns` and the `run_end` `turns` on exhaustion are exercised by the
+REPL path (`main.rs`), covered by the lab run. Existing tests green; CI on
+both platforms.
 
 ## After implementation: L2-R1 (pre-registration draft)
 

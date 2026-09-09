@@ -80,9 +80,11 @@ pub enum LoopError {
 impl fmt::Display for LoopError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LoopError::MaxTurnsExceeded { max_turns } => {
-                write!(f, "agent loop exceeded max_turns = {max_turns}")
-            }
+            LoopError::MaxTurnsExceeded { max_turns } => write!(
+                f,
+                "model-call budget exhausted (max_turns = {max_turns}); the run is incomplete; \
+                 the transcript is kept"
+            ),
             LoopError::EmptyAssistantResponse => write!(
                 f,
                 "the model returned an empty response (no tool calls and no text)"

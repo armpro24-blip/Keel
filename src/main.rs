@@ -9,7 +9,7 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use keel::agent::AgentLoop;
+use keel::agent::{AgentLoop, LoopError};
 use keel::cli::{parse_args, Cli, USAGE};
 use keel::context::{ContextManager, HostInfo};
 use keel::edit::EditFileTool;
@@ -27,12 +27,6 @@ use keel::session::{SessionId, THREAD_ID_ENV};
 use keel::shell::ShellTool;
 use keel::tool::ToolRegistry;
 use keel::workspace::Workspace;
-
-/// Model calls per user input before the fuse blows. Eight sufficed for M0
-/// tests; a real multi-step task with a couple of retries needs more
-/// (`docs/evidence/M2C_SMOKE_2026-09-07.md`). The fuse still exists only to
-/// stop a non-converging loop, so it stays far below "unbounded".
-const MAX_TURNS: usize = 32;
 
 /// Write one line to stdout. A closed pipe (`keel pira check | head -1`) is
 /// the reader's choice, not a fault: stop quietly instead of panicking.
@@ -195,7 +189,7 @@ fn log_show(path: &str) -> i32 {
 
 /// The REPL. PIRA must be readable and compatible before the model is asked
 /// anything; drift is a warning, INCOMPATIBLE refuses to start (PLAN.md §4.2).
-fn repl(model_name: String, trace: bool, mode: ApprovalMode, record_wire: bool) {
+fn repl(model_name: String, trace: bool, mode: ApprovalMode, record_wire: bool, max_turns: usize) {
     // Cheap configuration mistakes first, then the PIRA gate.
     let mut model = match OpenAiChatModel::from_env(model_name) {
         Ok(model) => model,
@@ -282,11 +276,14 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode, record_wire: bool) 
         "session": session.as_str(),
         "workspace_root": workspace.root().display().to_string(),
         "approval_mode": mode.describe(),
+        "max_turns": max_turns,
         "pira_commit": inspection.fingerprint.source_commit,
         "pira_compatibility": inspection.compatibility.to_json(),
         "host_block": context.host_block(),
     }));
     eprintln!("[log] {}", log.path().display());
+    // Always shown: the operator must see the bound that applies (PLAN.md §8 T22).
+    eprintln!("[max_turns] {max_turns} per user message");
     if record_wire {
         let wire = SessionLog::open(&sessions_dir, &format!("{}.wire", session.as_str()))
             .unwrap_or_else(|error| {
@@ -298,7 +295,7 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode, record_wire: bool) 
     }
     let agent = AgentLoop {
         system: context.system_instruction(),
-        max_turns: MAX_TURNS,
+        max_turns,
     };
     if trace {
         eprintln!("[session] {}", session.as_str());
@@ -344,6 +341,15 @@ fn repl(model_name: String, trace: bool, mode: ApprovalMode, record_wire: bool) 
                 "event": "run_end",
                 "turns": outcome.turns,
             })),
+            // An exhausted budget made exactly `max_turns` calls, so the log
+            // says so; other failures leave the count out rather than guess.
+            Err(error @ LoopError::MaxTurnsExceeded { max_turns }) => {
+                log.record(serde_json::json!({
+                    "event": "run_end",
+                    "error": error.to_string(),
+                    "turns": max_turns,
+                }))
+            }
             Err(error) => log.record(serde_json::json!({
                 "event": "run_end",
                 "error": error.to_string(),
@@ -371,13 +377,14 @@ fn main() {
             trace,
             full,
             record_wire,
+            max_turns,
         }) => {
             let mode = if full {
                 ApprovalMode::Full
             } else {
                 ApprovalMode::Ask
             };
-            repl(model, trace, mode, record_wire)
+            repl(model, trace, mode, record_wire, max_turns)
         }
         Ok(Cli::PiraCheck { lock }) => std::process::exit(pira_check(lock)),
         Ok(Cli::LogShow { path }) => std::process::exit(log_show(&path)),

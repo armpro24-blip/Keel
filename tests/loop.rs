@@ -146,6 +146,10 @@ fn max_turns_is_an_explicit_fuse() {
         .unwrap_err();
 
     assert_eq!(error, LoopError::MaxTurnsExceeded { max_turns: 2 });
+    assert_eq!(
+        error.to_string(),
+        "model-call budget exhausted (max_turns = 2); the run is incomplete; the transcript is kept"
+    );
     // user input + 2 × (assistant call, tool results) stay with the caller
     assert_eq!(transcript.len(), 5);
     assert_eq!(model.seen.len(), 2, "the fuse stops further model calls");

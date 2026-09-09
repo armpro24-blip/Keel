@@ -1,6 +1,6 @@
 //! Command-line parsing tests.
 
-use keel::cli::{parse_args, Cli};
+use keel::cli::{parse_args, Cli, DEFAULT_MAX_TURNS, MAX_TURNS_RANGE};
 
 fn args(list: &[&str]) -> Vec<String> {
     list.iter().map(|arg| arg.to_string()).collect()
@@ -12,6 +12,7 @@ fn run(model: &str, trace: bool, full: bool) -> Cli {
         trace,
         full,
         record_wire: false,
+        max_turns: DEFAULT_MAX_TURNS,
     }
 }
 
@@ -32,6 +33,7 @@ fn model_flag_trace_and_full() {
             trace: false,
             full: false,
             record_wire: true,
+            max_turns: DEFAULT_MAX_TURNS,
         })
     );
 }
@@ -88,4 +90,30 @@ fn pira_check_subcommand() {
     assert!(parse_args(&args(&["pira"]), None).is_err());
     assert!(parse_args(&args(&["pira", "sync"]), None).is_err());
     assert!(parse_args(&args(&["pira", "check", "--force"]), None).is_err());
+}
+
+#[test]
+fn max_turns_defaults_to_32_and_accepts_the_whole_legal_range() {
+    assert_eq!(DEFAULT_MAX_TURNS, 32);
+    assert_eq!(MAX_TURNS_RANGE, 1..=1000);
+    let parsed = |value: &str| parse_args(&args(&["--model", "m", "--max-turns", value]), None);
+    for (value, expected) in [("1", 1), ("50", 50), ("1000", 1000)] {
+        match parsed(value) {
+            Ok(Cli::Run { max_turns, .. }) => assert_eq!(max_turns, expected, "{value}"),
+            other => panic!("{value}: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn max_turns_outside_the_range_or_malformed_is_a_usage_error_naming_the_range() {
+    for value in ["0", "1001", "-1", "abc", "", "32.0"] {
+        let error = parse_args(&args(&["--model", "m", "--max-turns", value]), None).unwrap_err();
+        assert_eq!(
+            error, "--max-turns needs an integer from 1 to 1000",
+            "{value:?}"
+        );
+    }
+    let missing = parse_args(&args(&["--model", "m", "--max-turns"]), None).unwrap_err();
+    assert_eq!(missing, "--max-turns needs an integer from 1 to 1000");
 }
