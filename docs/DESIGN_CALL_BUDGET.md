@@ -90,17 +90,17 @@ Qwen3.6, vLLM 0.26.0, `full`, `--trace --record-wire`. One variable: an
 explicit `--max-turns N`. **No operator `Continue` at all**: a fused run is
 the result. The original L2 result stays as recorded.
 
-The budget must have an independent resource basis and must not be set by
-reference to the 76 calls observed in L2. Candidates for the reviewer:
-
-| Basis | Derivation | Resulting N |
-|---|---|---|
-| wall-clock per message | operator accepts at most 10 minutes of model time per message; L2 measured ~5.0 s per call (383 s / 76) | 120 |
-| context per message | operator accepts context growth to at most 64k tokens per message; L2 grew ~0.66k tokens per call from a 6.5k start | ~87 |
-| declared authorization | operator authorizes a round resource ceiling for autonomous work on a task of this size | 100 |
-
-The basis chosen, its derivation, and N are written into the L2-R1 protocol
-before the run. Evidence to compare with L2: acceptance, preservation,
+**Reviewer's choice (2026-09-09): declared authorization, N = 100.** The
+basis is fixed as: "This experiment pre-authorizes at most 100 model calls
+for the single task. It is an experimental resource allowance, not a
+prediction of the calls needed to complete, and it guarantees no time or
+context bound." The two derivations were not chosen: 383 s / 76 is an
+average wall-clock per call that includes tool execution, so 120 calls
+would not be a ten-minute guarantee; context growth is not linear, so 87
+calls would not guarantee staying under 64k. Honesty note: 100 is not a
+value chosen blind to L2 (76 calls were observed before it was set); it is
+not a fitted success threshold, and a later single success is not to be
+read as "the budget was optimal". Evidence to compare with L2: acceptance, preservation,
 handshake, calls, tokens, wall time, fused or not, and, if fused, what state
 the repository was left in. If L2-R1 fuses under a defensible budget, that is
 evidence about the task or the model's call efficiency, not a reason to

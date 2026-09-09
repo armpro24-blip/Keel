@@ -1,10 +1,11 @@
 # L2: a harder coding-maintenance workload (`queuewatch`)
 
-Status: **run 2026-09-09: passed, acceptance 13/13, seed tests 42/42
-preserved (12 added), handshake 16/16, host approvals 0. Dominant friction:
-the default `max_turns = 32` fuse blew twice; completion depended on 2 of 3
-`Continue` messages** (`docs/evidence/L2_2026-09-09.md`). Keel unchanged;
-work stopped for review.
+Status: **L2 run 2026-09-09: passed under the protocol (acceptance 13/13,
+seed tests 42/42 preserved, handshake 16/16, host approvals 0), not an
+autonomous completion under the default budget: the `max_turns = 32` fuse
+blew twice and 2 of 3 `Continue` messages were used**
+(`docs/evidence/L2_2026-09-09.md`). **L2-R1 protocol frozen below (T22,
+`--max-turns 100`, zero Continue); its run awaits separate approval.**
 
 ## Purpose
 
@@ -181,6 +182,55 @@ count (and the mean), from the before/after snapshots, only if the counters
 were not shared with other traffic. Prompt-token sums are never equated with
 newly computed prefill tokens. Without a clean baseline the derived values
 are omitted and the reason stated.
+
+## L2-R1: the same task under an explicit budget, no operator continuation
+
+Purpose: L2 passed only with two operator `Continue` messages after the
+default fuse (`max_turns = 32`) blew twice. L2-R1 asks whether the same task
+completes autonomously under an explicitly authorized, finite budget with no
+continuation at all. The original L2 result stays as recorded.
+
+Frozen values (the run does not start if any differs on the lab machine):
+
+```text
+L2 seed / task / acceptance / preservation:  unchanged (seed 5d668de, frozen/task.md, 13 checks, 42 IDs)
+Keel runtime:  15181da (T22 only on top of ba47934; cargo test 15 suites)
+PIRA:          4e0682dd745f1dbafa772d9c11b369132db4c1a8 (AGENTS.md sha256 e6c7d630…)
+model / vLLM:  nvidia/Qwen3.6-35B-A3B-NVFP4 / 0.26.0
+mode / flags:  full; --trace --record-wire; --max-turns 100
+Continue:      none. A run that exhausts the budget is the result; no budget is added during the run.
+```
+
+Budget basis, fixed in advance: **"This experiment pre-authorizes at most
+100 model calls for the single task. It is an experimental resource
+allowance, not a prediction of the calls needed to complete, and it
+guarantees no time or context bound."** 100 was chosen after L2's 76 calls
+were known; it is not a fitted success threshold, and a single success under
+it is not to be read as an optimal budget.
+
+Procedure differences from L2: step 1 also checks `git log -1 --format=%h --
+src tests Cargo.toml Cargo.lock` = `15181da` and that the REPL prints
+`[max_turns] 100 per user message` at startup; step 4 adds `--max-turns
+100`; step 5 sends no `Continue`: when the run ends with
+`error: model-call budget exhausted (max_turns = 100); the run is
+incomplete; the transcript is kept`, or with a declared completion, send
+`/quit`. A question from the model is still answered only from the frozen
+text. Everything else, including the metrics snapshots, is as in L2.
+
+Pre-registered evidence: as for L2 plus: whether the budget was exhausted;
+`session_start.max_turns`; `run_end` (`turns`, and `error` if exhausted);
+if exhausted, the state of the repository (acceptance and preservation are
+still run on it and reported as-is). Comparison against L2: acceptance,
+preservation, handshake, calls by tool, model calls, tokens, wall time,
+fused or not, interventions (expected: task and `/quit` only).
+
+Interpretation, fixed in advance: completion with acceptance 13/13 and
+preservation 42/42 under 100 calls with zero continuation → record that the
+task completes autonomously under an explicit budget on this model; not a
+statement about the default. Exhaustion → record the incomplete state as
+the result; it is evidence about the task and the model's call efficiency,
+not a reason to raise N afterwards. Report: `docs/evidence/L2R1_<date>.md`;
+stop for review.
 
 ## Interpretation rule
 
