@@ -1,7 +1,11 @@
 # Model/serving tool-protocol audit (after L2-R1)
 
-Status: **protocol ready; static steps 1–3 to be run on the lab machine;
-step 4 needs separate approval.** Keel, PIRA, and the frozen workloads are
+Status: **steps 1–3 run 2026-09-09 as far as the lab machine allows
+(`docs/evidence/TOOL_PROTOCOL_AUDIT_2026-09-09.md`): step 1 partial (vLLM is
+on another host), step 2 complete for both wires, step 3 not executable
+locally. Classification: model output non-compliant with the template
+(primary); parser's silent success to be confirmed by a read-only source
+read on the serving host. Step 4 not needed yet.** Keel, PIRA, and the frozen workloads are
 unchanged. Keel continues to execute only formal `tool_calls`; candidates,
 examples, or fragments found in reasoning are never promoted to actions.
 
