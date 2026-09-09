@@ -1,0 +1,20 @@
+{"ts": "2026-09-03T06:00:00", "job": "ingest", "event": "created"}
+{"ts": "2026-09-03T06:00:02", "job": "ingest", "event": "started", "worker": "n1"}
+{"ts": "2026-09-03T06:00:30", "job": "transform", "event": "created"}
+{"ts": "2026-09-03T06:01:12", "job": "ingest", "event": "failed", "reason": "connection reset"}
+{"ts": "2026-09-03T06:01:20", "job": "ingest", "event": "retry"}
+{"ts": "2026-09-03T06:01:22", "job": "ingest", "event": "started", "worker": "n2"}
+{"ts": "2026-09-03T06:02:00", "job": "transform", "event": "started", "worker": "n3"}
+{"ts": "2026-09-03T06:03:45", "job": "ingest", "event": "completed"}
+{"ts": "2026-09-03T06:04:00", "job": "publish", "event": "created"}
+{"ts": "2026-09-03T06:05:10", "job": "transform", "event": "failed", "reason": "schema mismatch"}
+{"ts": "2026-09-03T06:05:15", "job": "transform", "event": "retry"}
+{"ts": "2026-09-03T06:05:16", "job": "transform", "event": "started", "worker": "n3"}
+{"ts": "2026-09-03T06:07:02", "job": "transform", "event": "failed", "reason": "schema mismatch"}
+{"ts": "2026-09-03T06:07:05", "job": "transform", "event": "retry"}
+{"ts": "2026-09-03T06:07:06", "job": "transform", "event": "started", "worker": "n1"}
+{"ts": "2026-09-03T06:08:00", "job": "publish", "event": "started", "worker": "n2"}
+{"ts": "2026-09-03T06:09:30", "job": "transform", "event": "completed"}
+{"ts": "2026-09-03T06:09:40", "job": "publish", "event": "failed", "reason": "auth expired"}
+{"ts": "2026-09-03T06:10:00", "job": "publish", "event": "retry"}
+{"ts": "2026-09-03T06:11:00", "job": "cleanup", "event": "created"}

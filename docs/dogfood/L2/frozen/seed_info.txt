@@ -1,0 +1,5 @@
+seed commit: 5d668de873a86ec0e07a967d850133167a4919bb
+seed tree:   c050c5d3edc5b96864eca11366d39da2508ed485
+seed tests:  42
+authoring Python: 3.14.0 (Windows); lab Python expected 3.12.10
+frozen: 2026-09-09

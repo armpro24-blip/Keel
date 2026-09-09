@@ -1,0 +1,18 @@
+{"ts": "2026-09-01T08:00:00", "job": "build-api", "event": "created"}
+{"ts": "2026-09-01T08:00:05", "job": "build-api", "event": "started", "worker": "w1"}
+{"ts": "2026-09-01T08:00:07", "job": "build-web", "event": "created"}
+{"ts": "2026-09-01T08:03:17", "job": "build-api", "event": "completed"}
+{"ts": "2026-09-01T08:03:20", "job": "build-web", "event": "started", "worker": "w2"}
+{"ts": "2026-09-01T08:04:00", "job": "lint", "event": "created"}
+{"ts": "2026-09-01T08:04:02", "job": "lint", "event": "started", "worker": "w1"}
+{"ts": "2026-09-01T08:04:41", "job": "lint", "event": "completed"}
+{"ts": "2026-09-01T08:05:00", "job": "test-unit", "event": "created"}
+{"ts": "2026-09-01T08:05:01", "job": "test-unit", "event": "started", "worker": "w3"}
+{"ts": "2026-09-01T08:06:55", "job": "build-web", "event": "failed", "reason": "out of memory"}
+{"ts": "2026-09-01T08:09:31", "job": "test-unit", "event": "completed"}
+{"ts": "2026-09-01T08:10:00", "job": "deploy", "event": "created"}
+{"ts": "2026-09-01T08:10:00", "job": "docs", "event": "created"}
+{"ts": "2026-09-01T08:10:03", "job": "docs", "event": "started", "worker": "w2"}
+{"ts": "2026-09-01T08:11:00", "job": "test-e2e", "event": "created"}
+{"ts": "2026-09-01T08:11:02", "job": "test-e2e", "event": "started", "worker": "w3"}
+{"ts": "2026-09-01T08:14:40", "job": "test-e2e", "event": "failed", "reason": "timeout"}
