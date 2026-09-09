@@ -4,8 +4,10 @@ Status: **L2 run 2026-09-09: passed under the protocol (acceptance 13/13,
 seed tests 42/42 preserved, handshake 16/16, host approvals 0), not an
 autonomous completion under the default budget: the `max_turns = 32` fuse
 blew twice and 2 of 3 `Continue` messages were used**
-(`docs/evidence/L2_2026-09-09.md`). **L2-R1 protocol frozen below (T22,
-`--max-turns 100`, zero Continue); its run awaits separate approval.**
+(`docs/evidence/L2_2026-09-09.md`). **L2-R1 run 2026-09-09: failed, acceptance 10/13, project suite 6F/3E,
+seed tests 42/42 preserved; the session ended at model call 40 of 100 with
+an empty assistant response (T19), not by the budget**
+(`docs/evidence/L2R1_2026-09-09.md`). Work stopped for review.
 
 ## Purpose
 
