@@ -27,14 +27,26 @@ model/serving boundary; responsibility to be isolated.**
 
 ## Step 1: record the serving configuration (read-only)
 
-From the lab machine, without changing anything:
+Correction (2026-09-09): the first version assumed vLLM and Keel share a
+machine. They do not: Keel runs on `192.168.3.182`, vLLM on
+`192.168.3.103`. Step 1 is therefore two parts.
+
+**1a, on the Keel host (HTTP side, no authorization needed):**
 
 ```bash
-# process arguments of the running server (Windows: PowerShell)
-Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'vllm' } | Select-Object -ExpandProperty CommandLine
 curl -s http://192.168.3.103:8000/version
 curl -s -H "Authorization: Bearer dummy" http://192.168.3.103:8000/v1/models
+curl -s http://192.168.3.103:8000/metrics | grep cache_config_info
+# rendered template: POST /tokenize with a small messages+tools body, then /detokenize; record its sha256
 ```
+
+**1b, on the serving host itself (process and source side):** requires
+separate authorization for access to that machine; it is not run over SSH
+from the Keel session. Run `docs/dogfood/L2/tools/serving_host_probe.sh`
+there (read-only: version and path of the installed vLLM, the server's
+launch arguments, parser modules present, template and generation-config
+hashes when the weights path is visible, and the source excerpts step 3
+needs).
 
 Record: vLLM version; model id and revision (the `/v1/models` `root`, and
 the local weights directory's `config.json` / `generation_config.json`
@@ -70,8 +82,9 @@ model closing its thinking channel late or not at all on call 40)?
 
 ## Step 3: compare with the installed version's official behavior
 
-For the exact vLLM version and parsers recorded in step 1, read the
-installed source (not the latest upstream): the reasoning parser's
+Runs on the serving host (same authorization as 1b; the probe script prints
+the excerpts). For the exact vLLM version and parsers recorded in step 1,
+read the installed source (not the latest upstream): the reasoning parser's
 delimiter handling (what happens when the closing think marker is absent or
 appears after tool markup) and the tool parser's extraction rules (where it
 looks for `<tool_call>` blocks, whether it scans text classified as

@@ -65,8 +65,9 @@ Equivalent facts derived from the interface (each with its basis):
 | default `max_tokens` / stop settings | unavailable | remote host |
 | KV / prefix cache | `enable_prefix_caching=True`, `cache_dtype=fp8`, `gpu_memory_utilization=0.4`, `block_size=2144` | `/metrics` `vllm:cache_config_info` |
 
-Rendered template excerpt (sha256 `8d94cb8f…`, from a three-message probe,
-not from a session):
+Rendered template excerpt (sha256
+`8d94cb8fabe7e7463e3cf92c42b5c4a009dc906ebe0bb7642c3115b5863eb07c`, from a
+three-message probe, not from a session):
 
 ```text
 <|im_start|>system
@@ -235,10 +236,16 @@ the denial".
 
 ## Step 3: installed-source comparison (not executable from the lab machine)
 
-`import vllm` fails and no vLLM source tree exists on the lab machine; the
-installed 0.26.0 lives on `192.168.3.103`. File paths and line ranges of the
-reasoning and tool parsers therefore could not be cited. The read-only
-commands that would complete this step, to be run on `192.168.3.103`:
+`import vllm` fails and no vLLM source tree exists on the lab machine
+(`192.168.3.182`); the installed 0.26.0 lives on `192.168.3.103`. An SSH
+attempt from the Keel session toward that host was stopped by the permission
+policy as cross-host remote execution needing separate authorization (port
+22 open, key in `known_hosts`, `~/.ssh/config` user `infolabor`: the
+channel itself works). File paths and line ranges therefore could not be
+cited. The step is completed by running
+`docs/dogfood/L2/tools/serving_host_probe.sh` **on the serving host itself**
+(if the host named `spark-a4b3` is that machine, run it there directly);
+equivalent manual commands:
 
 ```bash
 python -c "import vllm, os; print(vllm.__version__, os.path.dirname(vllm.__file__))"
@@ -292,9 +299,16 @@ and neither mechanism is requested by this audit.
 
 ## What remains open, and the next static step
 
-1. The remote read-only source read above (step 3). It settles the
-   secondary observation and the fate of the opening tags. It requires no
-   model run and no configuration change.
+1. The read-only source read on the serving host (step 3, via
+   `serving_host_probe.sh`). It settles the secondary observation and the
+   fate of the opening tags. It requires no model run and no configuration
+   change, but it does require authorized access to `192.168.3.103`, which
+   is the reviewer's decision, not something the Keel session initiates. The
+   decisive reading: if `serving_chat.py` first strips the thinking segment
+   and hands only the remaining content to `extract_tool_calls`, then a call
+   written inside an unclosed think block is structurally unextractable and
+   the four empty responses are the necessary outcome of the model's output,
+   not a parser accident.
 2. Only if that read cannot discriminate, the pre-registered minimal probe
    of the protocol's step 4, submitted for approval first.
 
