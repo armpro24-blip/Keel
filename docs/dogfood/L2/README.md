@@ -194,7 +194,7 @@ Frozen values (the run does not start if any differs on the lab machine):
 
 ```text
 L2 seed / task / acceptance / preservation:  unchanged (seed 5d668de, frozen/task.md, 13 checks, 42 IDs)
-Keel runtime:  15181da (T22 only on top of ba47934; cargo test 15 suites)
+Keel runtime:  822fdbc (T22 only on top of ba47934; cargo test 15 suites)
 PIRA:          4e0682dd745f1dbafa772d9c11b369132db4c1a8 (AGENTS.md sha256 e6c7d630…)
 model / vLLM:  nvidia/Qwen3.6-35B-A3B-NVFP4 / 0.26.0
 mode / flags:  full; --trace --record-wire; --max-turns 100
@@ -209,13 +209,18 @@ were known; it is not a fitted success threshold, and a single success under
 it is not to be read as an optimal budget.
 
 Procedure differences from L2: step 1 also checks `git log -1 --format=%h --
-src tests Cargo.toml Cargo.lock` = `15181da` and that the REPL prints
+src tests Cargo.toml Cargo.lock` = `822fdbc` and that the REPL prints
 `[max_turns] 100 per user message` at startup; step 4 adds `--max-turns
 100`; step 5 sends no `Continue`: when the run ends with
 `error: model-call budget exhausted (max_turns = 100); the run is
 incomplete; the transcript is kept`, or with a declared completion, send
 `/quit`. A question from the model is still answered only from the frozen
-text. Everything else, including the metrics snapshots, is as in L2.
+text, and that answer is a recorded human intervention: it is a new user
+message, so it starts a new run and a new count, and the result can then no
+longer be described as "one task completed autonomously within a single
+100-call run". Any other run error (provider error, empty response) is
+likewise the result; nothing is retried. Everything else, including the
+metrics snapshots, is as in L2.
 
 Pre-registered evidence: as for L2 plus: whether the budget was exhausted;
 `session_start.max_turns`; `run_end` (`turns`, and `error` if exhausted);
