@@ -92,7 +92,7 @@ class Acceptance(unittest.TestCase):
             os.unlink(path)
         self.assertEqual(result.returncode, 0, result.stderr)
         table, summary = rows(result.stdout)
-        self.assertEqual(table["j"][:2], ("queued", "2"))
+        self.assertEqual(table["j"], ("queued", "2", "-"))
         self.assertEqual(summary, "total 1  queued 1  running 0  completed 0  failed 0")
 
     def test_a04_each_retry_increments_the_attempt_count(self):

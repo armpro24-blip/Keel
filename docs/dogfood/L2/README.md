@@ -1,7 +1,9 @@
 # L2: a harder coding-maintenance workload (`queuewatch`)
 
-Status: **benchmark-design package ready for review (2026-09-09). Not yet
-run.** Keel is unchanged; no model has been called for L2.
+Status: **reviewed 2026-09-09, conditionally approved; the two required
+corrections are applied (retry duration reset made an observable contract in
+the task and A03; run baseline frozen below). Approved for one run under this
+protocol.** Keel is unchanged; no model has been called for L2.
 
 ## Purpose
 
@@ -60,7 +62,8 @@ date; prints commit and tree; runs the seed suite).
 
 See `frozen/task.md`. In substance: add `retry` (valid only from `failed`;
 increments `attempt`; returns the job to `queued` so it can be started and
-finished again; a retry in any other status is an invalid transition
+finished again; on retry the duration resets to `-` and afterwards covers
+only the new attempt; a retry in any other status is an invalid transition
 reported like the existing ones, no traceback); add `--status STATUS` to
 `report` (filters rows; the summary still counts all jobs; unknown STATUS is
 a usage error; output unchanged without the option); update the README; add
@@ -74,7 +77,7 @@ creating any new source or test file.
 
 Formal gates: A01 the project suite passes; A02 **every frozen seed test ID
 is still present** (identity, not count; `tools/seed_test_preservation.py`).
-Behavior: A03 retry after failure → queued, attempt 2; A04 each retry
+Behavior: A03 retry after failure → queued, attempt 2, duration reset to `-`; A04 each retry
 increments the attempt (production log: ingest completed/2,
 transform completed/3, publish queued/2, cleanup queued/1, summary
 `total 4  queued 2  running 0  completed 2  failed 0`); A05 a retried job
@@ -87,8 +90,10 @@ traceback; A12 report without `--status` equals the frozen legacy output and
 `check` still says `ok: 18 events, 7 jobs`; A13 README mentions `retry` and
 `--status`.
 
-Validation before freezing (2026-09-09): on the unmodified seed 10 of 13
-fail (A01, A02, A12 pass); with the benchmark author's reference solution,
+Validation before freezing (2026-09-09, repeated after the review
+corrections): on the unmodified seed A03–A06, A08–A10 and A13 fail (8
+checks; A06's three subtests make unittest report 10 failures) while A01,
+A02, A07, A11 and A12 pass, as they should at the seed; with the benchmark author's reference solution,
 applied to a scratch copy and never committed into the seed, the seed suite
 is 45/45, acceptance 13/13, preservation 42/42 with 3 added. The reference
 diff touches 6 files (`events.py`, `state.py`, `report.py`, `cli.py`,
@@ -100,14 +105,20 @@ reproduced the frozen tree hash. `grep retry` over the seed's `.py` and
 
 ## Pre-registered tested configuration
 
+Frozen values; the run does not start if any of them differs on the lab
+machine (stop before sending the task, report the mismatch):
+
 ```text
-Keel: post-L1 baseline b0312d2 (code ba47934) or later reviewed baseline, unchanged
-PIRA: canonical baseline at ~/agent (record commit and AGENTS.md sha256)
-model: nvidia/Qwen3.6-35B-A3B-NVFP4; vLLM: existing lab configuration (record version)
-mode: full          flags: --trace --record-wire          max_turns: existing default (32)
+L2 package:   the Keel commit recorded in frozen/seed_info.txt under "L2 package commit"
+Keel runtime: src/, tests/ and Cargo files last changed at ba47934 (cargo test: 15 suites, 95 tests)
+PIRA:         4e0682dd745f1dbafa772d9c11b369132db4c1a8 at ~/agent (AGENTS.md sha256 e6c7d630…)
+model:        nvidia/Qwen3.6-35B-A3B-NVFP4
+vLLM:         0.26.0 (the L1-R2 configuration, unchanged)
+mode/flags:   full; --trace --record-wire; max_turns = 32 (default, not raised)
 ```
 
-No compaction, retries, extra tools, or other mechanisms. No hint about
+No compaction, retries, extra tools, hints, or serving-configuration
+changes. No hint about
 `edit_file`, safety reviews, PIRA tools, or workflow beyond the normal Keel
 and PIRA instruction and tool schemas. If the fuse or context behavior
 becomes the failure, that is evidence.
