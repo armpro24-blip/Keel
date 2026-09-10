@@ -13,11 +13,14 @@ Outcomes, as preregistered:
   line_ending    D1 only: the file differs from expected only by CRLF or a UTF-8 BOM
   arg_errors     confirmed argument-usage errors: structural denials (argv not an array, standalone
                  shell operator) plus output evidence that an explicitly invoked shell changed or
-                 split an element (Python echoed a line that is not a line of any sent element, or
-                 "can't open file")
-  prog_errors    the program's own error: a Python SyntaxError whose echoed line is a line of a sent
-                 element, whether or not a shell was invoked
-  undetermined   a SyntaxError with no echoed line to compare
+                 split an element (Python echoed a fragment of the intended program cut at a quote
+                 with a truncation message, or "can't open file" after a shell)
+  prog_errors    the program's own error: a Python SyntaxError with no shell in argv (the transport
+                 is faithful, stage 1), or, through a shell, one whose echoed line is a line of the
+                 program the model meant to run
+  undetermined   a SyntaxError through a shell with no echoed line, or an echoed line that matches
+                 neither rule. A synopsis that dropped the `SyntaxError:` line is not counted at all
+                 (a known undercount; the run's error flag still shows the failure)
   helper_calls   helper-file related calls: tool calls naming a file that is neither tracked in the
                  run repository nor the task's own target; the paths are listed for hand review
   model_calls, tool_calls, denials_review (edits/commands denied for a missing review),
@@ -62,22 +65,58 @@ def program_name(argv):
     return name[:-4] if name.lower().endswith(".exe") else name
 
 
+TRUNCATION = ("unterminated string literal", "unexpected EOF", "was never closed",
+              "unexpected character after line continuation")
+INLINE_PROGRAM = re.compile(r"""-c\s+(?:"(.*)"|'(.*)'|(\S+))\s*$""", re.S)
+
+
+def intended_programs(argv):
+    """The program texts the model meant to run: the element after `-c` for a
+    direct interpreter call, or the quoted text after `-c` inside an explicit
+    shell's command element."""
+    programs = []
+    for i, element in enumerate(argv):
+        element = str(element)
+        if element == "-c" and i + 1 < len(argv):
+            programs.append(str(argv[i + 1]))
+        match = INLINE_PROGRAM.search(element)
+        if match:
+            programs.append(next(g for g in match.groups() if g is not None))
+    return programs
+
+
 def classify_syntax_error(argv, output):
-    """'arg' (shell altered the element), 'prog' (the program's own error), or 'undetermined'."""
+    """'arg' (a shell changed or split the element), 'prog' (the program's own
+    error), 'undetermined' (error text without evidence either way), or None
+    (no SyntaxError / open-file failure visible in the observation).
+
+    With no shell in argv the transport is faithful (stage 1), so a
+    SyntaxError is the program's own. With a shell, the echoed line is
+    compared against the program the model meant to run: a full line of it
+    is the program's own error; a fragment cut at a quote with a truncation
+    message is the shell's doing; anything else is undetermined.
+    """
     text = SYNOPSIS_PREFIX.sub("", output)
-    if "SyntaxError" not in text and "can't open file" not in text:
+    has_syntax = "SyntaxError" in text
+    has_open = "can't open file" in text
+    if not has_syntax and not has_open:
         return None
     invoked_shell = program_name(argv) in SHELLS
-    if "can't open file" in text and invoked_shell:
+    if not invoked_shell:
+        return "prog" if has_syntax else "undetermined"
+    if has_open:
         return "arg"
     echoed = ECHOED_LINE.search(text)
     if not echoed:
         return "undetermined"
-    line = echoed.group(1)
-    sent_lines = {l.strip() for element in argv for l in str(element).splitlines()}
-    if line.strip() in sent_lines:
+    line = echoed.group(1).strip()
+    programs = intended_programs(argv)
+    if any(line in {l.strip() for l in program.splitlines()} for program in programs):
         return "prog"
-    return "arg" if invoked_shell else "undetermined"
+    fragment = line.strip("\"'")
+    if any(s in text for s in TRUNCATION) and any(fragment and program.startswith(fragment) for program in programs):
+        return "arg"
+    return "undetermined"
 
 
 def tracked_files(repo):

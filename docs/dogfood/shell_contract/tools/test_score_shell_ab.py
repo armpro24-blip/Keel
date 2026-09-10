@@ -42,17 +42,30 @@ class ClassifyTests(unittest.TestCase):
         out = '[stderr]\n  File "<string>", line 1\n    "import\n    ^\nSyntaxError: unterminated string literal (detected at line 1)\n'
         self.assertEqual(s.classify_syntax_error(argv, out), "arg")
 
-    def test_synopsis_prefixed_traceback_is_parsed(self):
+    def test_no_shell_means_the_programs_own_error_even_for_an_inner_exec_string(self):
         argv = ["python", "-c", "exec('try: f() except E: pass')"]
         out = ('Captured: 20260910-135905-514ca5dae94d (exit 1):\nPROGRAM data:\nL1 stderr: Traceback (most recent call last): \n'
                'L2 stderr:   File "<string>", line 1, in <module> \nL3 stderr:   File "<string>", line 1 \n'
-               'L4 stderr:     try: f() except E: pass \nL5 stderr:          ^^^^^^ \n')
-        # the echoed line is the inner exec string, not a line of the sent element: nothing proves a shell changed it
-        self.assertEqual(s.classify_syntax_error(argv, out), "undetermined")
+               'L4 stderr:     try: f() except E: pass \nL5 stderr:          ^^^^^^ \nL6 stderr: SyntaxError: invalid syntax \n')
+        self.assertEqual(s.classify_syntax_error(argv, out), "prog")
 
-    def test_no_echo_is_undetermined_and_no_error_is_none(self):
-        self.assertEqual(s.classify_syntax_error(["python", "-c", "x"], "[stderr]\nSyntaxError: invalid syntax\n"), "undetermined")
+    def test_shell_with_unparseable_echo_is_undetermined(self):
+        argv = ["cmd", "/C", "python -c \"print('a')\""]
+        out = '[stderr]\n  File "<string>", line 1\n    something else entirely\n    ^\nSyntaxError: invalid syntax\n'
+        self.assertEqual(s.classify_syntax_error(argv, out), "undetermined")
+        self.assertEqual(s.classify_syntax_error(argv, "[stderr]\nSyntaxError: invalid syntax\n"), "undetermined")
+
+    def test_synopsis_that_dropped_the_exception_line_is_not_counted(self):
+        # a known undercount: without the SyntaxError line nothing is classified
+        argv = ["python", "-c", "x; def f(): pass"]
+        out = 'L3 stderr:   File "<string>", line 1 \nL4 stderr:     x; def f(): pass \nL5 stderr:        ^^^ \n'
+        self.assertIsNone(s.classify_syntax_error(argv, out))
         self.assertIsNone(s.classify_syntax_error(["python", "-c", "x"], "ok\n[exit 0]\n"))
+
+    def test_intended_programs(self):
+        self.assertEqual(s.intended_programs(["python", "-c", "a; b"]), ["a; b"])
+        self.assertEqual(s.intended_programs(["cmd", "/C", "python -c \"import sys; print('x')\""]), ["import sys; print('x')"])
+        self.assertEqual(s.intended_programs(["sh", "-c", "python -c 'print(1)'"]), ["python -c 'print(1)'", "print(1)"])
 
 
 def events(final_text, run_end, tool_calls=(), denials=()):
@@ -92,7 +105,7 @@ class ScoreTests(unittest.TestCase):
         *_, counts, helpers, notes, _ = s.score(events("42", {"event": "run_end", "turns": 4}, calls, denials), "R1", self.repo)
         self.assertEqual(counts["arg_errors"], 2)
         self.assertEqual(counts["denials_review"], 1)
-        self.assertEqual(helpers, [])  # a.py is tracked; f.txt is a redirect target -> helper
+        self.assertEqual(helpers, ["f.txt"])  # a.py is tracked; f.txt is a redirect target -> helper
         self.assertEqual(counts["helper_calls"], 1)
 
     def test_d1_file_states(self):
