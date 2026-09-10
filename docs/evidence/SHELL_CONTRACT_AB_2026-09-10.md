@@ -33,8 +33,11 @@ array). Shell re-parsing, the class B's new sentences address, produced
 zero events in 80 runs; `undetermined` is zero. The B text says what an
 element is and what a shell does with it; it says nothing that A does not
 about the shape of `argv`, and the model collapsed argv more often under B
-(12 events in 9 runs) than under A (6 in 5). Each collapse was corrected on
-the next call in every case.
+(12 events in 9 runs) than under A (6 in 5). Of the 14 runs with a
+collapse, 13 went on to complete (D2-A-1 completed with a wrongly formatted
+answer; the other 12 completed correctly) and D1-A-9 exhausted its budget;
+whether each collapse was corrected on the very next call was not checked
+against the SessionLogs, which stay on the lab machine.
 
 **Correctness favoured B, for reasons the sample cannot attribute.**
 A's six non-correct runs: three are format failures around a right value
