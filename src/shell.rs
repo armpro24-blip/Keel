@@ -406,13 +406,22 @@ impl Tool for ShellTool {
             name: TOOL_NAME.to_string(),
             description: format!(
                 "Run a program with arguments. argv is executed directly, with no shell: \
-                 redirection, pipes, and && are not interpreted, and passing them as arguments \
-                 is rejected. If you need a shell, {}. Provide the actual command in argv and \
-                 its purpose in the top-level intent field. For ordinary commands, Keel \
-                 automatically runs argv through pira_ctx; do not wrap ordinary commands in \
-                 pira_ctx yourself. Invoke a PIRA internal tool directly only when that tool \
-                 itself is the intended command. Returns stdout, stderr, and the exit code. In \
-                 full-permission/no-approval mode a state_changing command needs a \
+                 argv[0] is the program and every other element is one argument, delivered \
+                 to the program exactly as written. Do not add quotes that only a shell would \
+                 remove (write [\"python\", \"-c\", \"print('hi')\"], not \
+                 [\"python\", \"-c\", \"\\\"print('hi')\\\"\"]); quotes, spaces, backslashes, and \
+                 newlines that belong to the argument's content stay in it. Redirection, pipes, \
+                 and && are shell features: as standalone argv elements they are rejected; they \
+                 work only inside the command element of an explicitly invoked shell. If you \
+                 need a shell, {}; the element after its command flag is then parsed by that \
+                 shell under its own quoting rules, not by Keel. workdir sets the child \
+                 process's current working directory. Relative paths and module imports are \
+                 then resolved according to that program's own rules. Provide the actual \
+                 command in argv and its purpose in the top-level intent field. For ordinary \
+                 commands, Keel automatically runs argv through pira_ctx; do not wrap ordinary \
+                 commands in pira_ctx yourself. Invoke a PIRA internal tool directly only when \
+                 that tool itself is the intended command. Returns stdout, stderr, and the exit \
+                 code. In full-permission/no-approval mode a state_changing command needs a \
                  safety_review before it runs.",
                 shell_hint()
             ),
