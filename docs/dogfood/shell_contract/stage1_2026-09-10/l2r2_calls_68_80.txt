@@ -1,0 +1,177 @@
+call  68
+  shell            allow ERR python -c from queuewatch.cli import main; import io, contextlib; out=io.StringIO(); err=io.StringIO(); ctx=contextlib.redirect_stdout(out), contextlib.redirect_stderr(err); exec('try: main(list(["report", "tests/../../data/sample.jsonl", "--status", "bogus"])) except SystemExit: pass'); exec('ctx.__enter__()'); print(repr(out.getvalue())); print(repr(err.getvalue()))  [id:20260910-135905-514ca5dae94d]
+    | Captured: 20260910-135905-514ca5dae94d (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: Traceback (most recent call last):
+    | L2 stderr:   File "<string>", line 1, in <module>
+    | L3 stderr:   File "<string>", line 1
+    | L4 stderr:     try: main(list(["report", "tests/../../data/sample.jsonl", "--status", "bogus"])) except SystemExit: pass
+    | L5 stderr:                                                                                       ^^^^^^
+
+call  69  text: Two issues:\n1. `--status bogus` isn't rejected by argparse — need `choices` on the argument.\n2. Column widths in report tests are wrong because narrower sets produce narrower columns.\n\nLet me fix both:
+  edit_file        allow ok  cli.py: 167B -> 193B  old[0]='    report.add_argument('
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\cli.py: 167 bytes (5 lines) -> 193 bytes (6 lines); file 1786 -> 1812 bytes
+
+call  70  text: Now fix the test expectations. The column widths depend on what data is present:
+  shell            allow ok  [exact] python -c from queuewatch.report import render_report, job_row\nfrom queuewatch.model import Job\nfrom datetime import datetime\nT = datetime(2026, 9, 1, 8, 0, 0)\ndef job(id, status, attempt=1, started=None, finished=None):\n    return Job(id=id, status=status, attempt=attempt, started_at=T.replace(second=started) if started is not None else None, finished_at=T.replace(second=finished) if finished is not None else None)\n# Test with a 'running' filter\nrows = [job('a', 'queued'), job('b', 'running', started=5), job('c', 'completed', started=0, finished=3)]\nprint(repr(render_report(r…
+    | 'job  status   attempt  duration\nb    running  1        -\ntotal 3  queued 1  running 1  completed 1  failed 0'
+    | ---
+    | 'job  status  attempt  duration\na    queued  1        -\ntotal 3  queued 1  running 1  completed 1  failed 0'
+    | ---
+    | 'job  status     attempt  duration\na    queued     1        -\nb    running    1        -\nc    completed  1        0:00:03\ntotal 3  queued 1  running 1  completed 1  failed 0'
+    | ---
+    | 'job  status  attempt  duration\na    queued  1        -\ntotal 1  queued 1  running 0  completed 0  failed 0'
+    | 'job  status  attempt  duration\na    failed  1        -\ntotal 3  queued 1  running 0  completed 1  failed 1'
+
+call  71
+  edit_file        allow ok  test_report.py: 1276B -> 1525B  old[0]='    def test_status_filter_limits_rows_but_summary_counts_all(self):'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_report.py: 1276 bytes (36 lines) -> 1525 bytes (43 lines); file 4017 -> 4266 bytes
+
+call  72  text: Now fix the CLI tests. The `--status bogus` with `choices` should produce exit code 2. And the column widths in the filtered outputs need to match:
+  shell            allow ok  [exact] python -c from queuewatch.report import render_report\nfrom queuewatch.model import Job\nfrom datetime import datetime\nT = datetime(2026, 9, 1, 8, 0, 0)\ndef job(id, status, attempt=1, started=None, finished=None):\n    return Job(id=id, status=status, attempt=attempt, started_at=T.replace(second=started) if started is not None else None, finished_at=T.replace(second=finished) if finished is not None else None)\nprint('--- failed filter ---')\nprint(repr(render_report([job('a', 'queued'), job('b', 'completed'), job('c', 'queued'), job('d', 'failed', started=0, finished=4)], status_fi…
+    | --- failed filter ---
+    | 'job  status  attempt  duration\nd    failed  1        0:00:04\ntotal 4  queued 2  running 0  completed 1  failed 1'
+    | --- running filter (no match) ---
+    | 'job  status  attempt  duration\ntotal 4  queued 2  running 0  completed 1  failed 1'
+    | --- all jobs summary filter ---
+    | 'job  status     attempt  duration\na    queued     1        -\nb    completed  1        -\nc    queued     1        -\nd    failed     1        0:00:04\ntotal 4  queued 2  running 0  completed 1  failed 1'
+    | [exit 0]
+
+call  73  text: I need to understand the current flow better. The issue is: `cli.py` filters `jobs_list`, then passes it to `render_report(jobs_list, args.status)`, so both rows AND summary use the filtered list. I need the summary to count ALL jobs while rows are filtered.
+  shell            allow ok  cmd /C type queuewatch\cli.py  [repeat x2]
+    | """Command line: ``queuewatch report FILE`` and ``queuewatch check FILE``."""
+    |
+    | import argparse
+    | import sys
+    |
+    | from .events import EventError, read_events
+    | from .model import STATUSES
+    | from .report import render_report
+  shell            allow ok  cmd /C type queuewatch\report.py  [repeat x1]
+    | """Rendering jobs as a report: one row per job, then a summary line."""
+    |
+    | from .model import STATUSES
+    | from .timeutil import duration_between, format_duration
+    |
+    | COLUMNS = ("job", "status", "attempt", "duration")
+    |
+    |
+
+call  74  text: The `cli.py` is already correct (passes all jobs to `render_report`). The tests just need correct column widths. Let me verify:
+  shell            allow ERR [exact] python -c from queuewatch.cli import main; import io, contextlib; out=io.StringIO(); err=io.StringIO(); ctx= contextlib.redirect_stdout(out), contextlib.redirect_stderr(err); ctx[0].__enter__(); ctx[1].__enter__(); try: main(['report', 'data/sample.jsonl', '--status', 'failed']) except: pass; ctx[1].__exit__(None,None,None); ctx[0].__exit__(None,None,None); print(repr(out.getvalue()))
+    | [stderr]
+    |   File "<string>", line 1
+    |     from queuewatch.cli import main; import io, contextlib; out=io.StringIO(); err=io.StringIO(); ctx= contextlib.redirect_stdout(out), contextlib.redirect_stderr(err); ctx[0].__enter__(); ctx[1].__enter__(); try: main(['report', 'data/sample.jsonl', '--status', 'failed']) except: pass; ctx[1].__exit__(None,None,None); ctx[0].__exit__(None,None,None); print(repr(out.getvalue()))
+    |                                                                                                                                                                                                                  ^^^
+    | SyntaxError: invalid syntax
+    | [exit 1]
+
+call  75
+  shell            allow ERR [exact] python -m queuewatch report data/sample.jsonl --status failed
+    | [stderr]
+    | queuewatch: [Errno 2] No such file or directory: 'data/sample.jsonl'
+    | [exit 1]
+
+call  76
+  shell            allow ok  cmd /C dir data\  [id:20260910-140001-614a4c36517b]
+    | Captured: 20260910-140001-614a4c36517b (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout:  Volume in Laufwerk C: hat keine Bezeichnung.
+    | L2 stdout:  Volumeseriennummer: 4AF2-E6CA
+    | L3 stdout:
+    | L4 stdout:  Verzeichnis von C:\Users\LM\Desktop\queuewatch-l2r2\data
+    | L5 stdout:
+  shell            allow ok  python -m queuewatch report data/events.jsonl --status failed  [id:20260910-140001-9d805a5b243e]
+    | Captured: 20260910-140001-9d805a5b243e (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: job        status  attempt  duration
+    | L2 stdout: build-web  failed  1        0:03:35
+    | L3 stdout: test-e2e   failed  1        0:03:38
+    | L4 stdout: total 7  queued 1  running 1  completed 3  failed 2
+    | [exit 0]
+
+call  77
+  shell            allow ERR [exact] python -c from queuewatch.report import render_report; from queuewatch.model import Job; from datetime import datetime; T = datetime(2026, 9, 1, 8, 0, 0); def job(id, status, attempt=1, started=None, finished=None): return Job(id=id, status=status, attempt=attempt, started_at=T.replace(second=started) if started is not None else None, finished_at=T.replace(second=finished) if finished is not None else None); print(repr(render_report([job('a', 'failed', started=0, finished=64), job('b', 'completed', started=0, finished=60), job('c', 'queued')], status_filter='failed'))); print('---'); …
+    | [stderr]
+    |   File "<string>", line 1
+    |     from queuewatch.report import render_report; from queuewatch.model import Job; from datetime import datetime; T = datetime(2026, 9, 1, 8, 0, 0); def job(id, status, attempt=1, started=None, finished=None): return Job(id=id, status=status, attempt=attempt, started_at=T.replace(second=started) if started is not None else None, finished_at=T.replace(second=finished) if finished is not None else None); print(repr(render_report([job('a', 'failed', started=0, finished=64), job('b', 'completed', started=0, finished=60), job('c', 'queued')], status_filter='failed'))); print('---'); print(repr(ren…
+    |                                                                                                                                                      ^^^
+    | SyntaxError: invalid syntax
+    | [exit 1]
+
+call  78  text: Let me write a small helper to get the exact output strings:
+  shell            allow ok  python -c exec(open('tests/test_report.py').read().split('class RowTests')[0])
+    | [exit 0]
+
+call  79
+  shell            allow ERR [exact] python -c exec(open('tests/test_report.py').read().split('\nif __name__')[0]); from queuewatch.report import render_report; print('=== failed filter ==='); print(repr(render_report([job('a', 'failed', started=0, finished=64), job('b', 'completed', started=0, finished=60), job('c', 'queued')], status_filter='failed'))); print('=== running filter (no match) ==='); print(repr(render_report([job('a', 'failed', started=0, finished=64), job('b', 'completed', started=0, finished=60), job('c', 'queued')], status_filter='running'))); print('=== None filter ==='); print(repr(render_report([job(…
+    | === failed filter ===
+    | [stderr]
+    | Traceback (most recent call last):
+    |   File "<string>", line 1, in <module>
+    |   File "<string>", line 16, in job
+    | ValueError: second must be in 0..59
+    | [exit 1]
+
+call  80  text: Right, `started=64` isn't valid for a second. Let me use a different approach — create a small script file:
+  shell            allow ERR [exact] python -c from queuewatch.model import Job; from queuewatch.report import render_report; from datetime import datetime; T=datetime(2026,9,1,8,0,0); def job(id,status,attempt=1,started=None,finished=None): s=T.replace(second=started%60) if started is not None else None; f=T.replace(second=finished%60) if finished is not None else None; return Job(id=id,status=status,attempt=attempt,started_at=s,finished_at=f); r=render_report([job('a','failed',started=10,finished=64),job('b','completed',started=5,finished=60),job('c','queued')],status_filter='failed'); print(r.__repr__())
+    | [stderr]
+    |   File "<string>", line 1
+    |     from queuewatch.model import Job; from queuewatch.report import render_report; from datetime import datetime; T=datetime(2026,9,1,8,0,0); def job(id,status,attempt=1,started=None,finished=None): s=T.replace(second=started%60) if started is not None else None; f=T.replace(second=finished%60) if finished is not None else None; return Job(id=id,status=status,attempt=attempt,started_at=s,finished_at=f); r=render_report([job('a','failed',started=10,finished=64),job('b','completed',started=5,finished=60),job('c','queued')],status_filter='failed'); print(r.__repr__())
+    |                                                                                                                                               ^^^
+    | SyntaxError: invalid syntax
+    | [exit 1]
+
+summary
+  model calls 100  tool calls 123  error results 34  empty responses 0
+  repeated identical calls 20  pira_ctx retrievals 0  helper-related calls 0
+  pira_ctx result IDs given to the model: 46; retrieved from later: 0
+    20260910-135253-73f09dfc2fe7  given at call 1  retrieved at never
+    20260910-135255-7c96d28dbefd  given at call 2  retrieved at never
+    20260910-135302-132d2fe3bfdd  given at call 4  retrieved at never
+    20260910-135304-7bbe8ec91317  given at call 4  retrieved at never
+    20260910-135311-337d034954d1  given at call 6  retrieved at never
+    20260910-135313-2438c3afc8e2  given at call 6  retrieved at never
+    20260910-135315-d377a5915533  given at call 6  retrieved at never
+    20260910-135317-451f08990635  given at call 6  retrieved at never
+    20260910-135318-f78a60b2d987  given at call 6  retrieved at never
+    20260910-135320-15dc734a6a38  given at call 6  retrieved at never
+    20260910-135324-f00efb5f2a6e  given at call 7  retrieved at never
+    20260910-135331-f434af871283  given at call 9  retrieved at never
+    20260910-135334-b97db2ee2a53  given at call 10  retrieved at never
+    20260910-135419-b5c1b698d5dd  given at call 20  retrieved at never
+    20260910-135419-d5e66217b27d  given at call 20  retrieved at never
+    20260910-135422-a0f7fba54c0b  given at call 21  retrieved at never
+    20260910-135424-1c5b132aab6d  given at call 22  retrieved at never
+    20260910-135428-33c85cbd02e0  given at call 24  retrieved at never
+    20260910-135431-1964f624e8fc  given at call 25  retrieved at never
+    20260910-135532-0f1b537c6be0  given at call 28  retrieved at never
+    20260910-135534-8bd937ce9365  given at call 29  retrieved at never
+    20260910-135606-46fe4b480113  given at call 35  retrieved at never
+    20260910-135610-d028c93ea81d  given at call 37  retrieved at never
+    20260910-135628-c7245abec5dd  given at call 42  retrieved at never
+    20260910-135639-2a4d608df94d  given at call 44  retrieved at never
+    20260910-135643-44eb1528c457  given at call 45  retrieved at never
+    20260910-135652-2ff0a10c1621  given at call 47  retrieved at never
+    20260910-135703-d6e0fc42be55  given at call 49  retrieved at never
+    20260910-135709-92e14666c970  given at call 51  retrieved at never
+    20260910-135733-447ced44c9ee  given at call 53  retrieved at never
+    20260910-135742-ba3259da35be  given at call 54  retrieved at never
+    20260910-135745-fca21cf35e5e  given at call 55  retrieved at never
+    20260910-135810-29b3a5e2b12d  given at call 59  retrieved at never
+    20260910-135819-84a0e3665b51  given at call 61  retrieved at never
+    20260910-135905-514ca5dae94d  given at call 68  retrieved at never
+    20260910-140001-614a4c36517b  given at call 76  retrieved at never
+    20260910-140001-9d805a5b243e  given at call 76  retrieved at never
+    20260910-140047-4da582764281  given at call 85  retrieved at never
+    20260910-140047-8295d0bf9fae  given at call 85  retrieved at never
+    20260910-140047-dbc36ef649b1  given at call 85  retrieved at never
+    20260910-140047-82c1322cb65f  given at call 85  retrieved at never
+    20260910-140053-4cfad59052ad  given at call 86  retrieved at never
+    20260910-140053-bd54a978a1e1  given at call 86  retrieved at never
+    20260910-140057-bbcbb5678fcf  given at call 87  retrieved at never
+    20260910-140106-99facb7ffe24  given at call 89  retrieved at never
+    20260910-140112-148cddf395e7  given at call 91  retrieved at never

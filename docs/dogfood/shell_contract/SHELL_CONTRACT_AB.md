@@ -1,7 +1,8 @@
 # Shell-tool argument contract: transport check, then a description A/B (T25)
 
-Status: **stage 1 (transport check) frozen 2026-09-10; stage 2 (A/B) is a
-draft for review, not approved to run.** Decision (user, 2026-09-10) after
+Status: **stage 1 complete 2026-09-10 on both machines, transport not at
+fault (`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`); stage 2 (A/B) is an
+amended draft for review after the lab's comments, not approved to run.** Decision (user, 2026-09-10) after
 the T24 audit: the candidate is to clarify the `shell` tool's
 argument-passing contract in its description. No new tool, no change to
 execution semantics, no full L2 rerun. The candidate is not expected to fix
@@ -26,10 +27,11 @@ two kinds that the description must treat differently:
   unterminated string. This is a contract fact Keel can state: argv goes to
   the program with no shell in between; if you invoke a shell, that shell's
   rules apply to its element.
-- **Invalid one-line Python.** Calls 68 and 80 (and probably 74, 77) put a
-  compound statement (`try:`, `def`) after `;` on one line; Python rejected
-  the program itself. Not a transport or quoting matter. The description can
-  say that an argument may contain newlines; it must not teach Python.
+- **Invalid one-line Python.** Calls 68, 74, 77, 80 (all four, confirmed
+  in stage 1 from the echoed tracebacks) put a compound statement (`try:`,
+  `def`) after `;` on one line; Python rejected the program itself. Not a
+  transport or quoting matter. The description can say that an argument may
+  contain newlines; it must not teach Python.
 
 Stage 1 decides whether either class has a transport component.
 
@@ -65,15 +67,16 @@ shell-reparse or invalid-Python:
 PYTHONUTF8=1 python <Keel>/docs/dogfood/L2/tools/debug_trace.py "<L2-R2 log>" --from 68 --to 80 --width 600 --lines 8
 ```
 
-The first data point exists: on the Keel author's machine (Windows, PIRA
-1.8.0, Python 3.14) the four assertions pass and `cmd /C` reproduces the
-`"import` unterminated-string failure
-(`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`). The lab run on the actual
-experiment machine (PIRA 1.9.0, Python 3.12.10) is still required.
+Result: passed on the author's machine (Windows, PIRA 1.8.0, Python 3.14)
+and on the lab machine (PIRA 1.9.0, Python 3.12.10) with line-for-line the
+same observations; `cmd /C` reproduces the `"import` unterminated-string
+failure on both; the four L2-R2 calls are all invalid one-line Python
+(`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`). Stop rule not triggered.
 
-## Stage 2 (draft for review): A/B on the `shell` description
+## Stage 2 (amended draft for review): A/B on the `shell` description
 
 Not approved to run. Every number below is a proposal for the reviewer.
+Amendments after the lab's stage-1 comments are marked *(amended)*.
 
 **Arms.** A: the current description (`src/shell.rs` at `822fdbc`). B: the
 clarified description below. B lives on an experiment branch that changes
@@ -89,9 +92,11 @@ configuration, no sampling parameters, PIRA `4e0682dd`, `--full --trace
 > to the program exactly as written. Do not add quotes that only a shell
 > would remove (write `["python", "-c", "print('hi')"]`, not
 > `["python", "-c", "\"print('hi')\""]`); quotes, spaces, backslashes, and
-> newlines that belong to the argument's content stay in it. Redirection,
-> pipes, and && are not interpreted, and passing them as arguments is
-> rejected. If you need a shell, {shell_hint}; the element after its
+> newlines that belong to the argument's content stay in it; this holds
+> just the same when the program text itself contains quotes. Redirection,
+> pipes, and && are shell features: as standalone argv elements they are
+> rejected; they work only inside the command element of an explicitly
+> invoked shell. If you need a shell, {shell_hint}; the element after its
 > command flag is then parsed by that shell under its own quoting rules,
 > not by Keel. workdir sets the process's working directory only; it does
 > not change how the program itself resolves modules or relative paths.
@@ -114,12 +119,20 @@ for D2, the data file below copied to `data/quotes.jsonl`).**
 |---|---|---|---|
 | R1 | read code, compute a deterministic result | "Count the test methods (functions whose name starts with `test_`) defined under `tests/` in this repository. Reply with the number only." | `42` |
 | R2 | read code, compute a deterministic result | "Compute the SHA-256 of the file `queuewatch/report.py` exactly as stored on disk. Reply with the lowercase hex digest only." | `25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44` |
-| D1 | data with quotes, spaces, backslashes | "Create the file `notes/summary.txt` whose entire content is the following line followed by one newline, byte for byte: `She said "it's done" -- path C:\tmp\x y`" | file bytes `She said "it's done" -- path C:\tmp\x y\n` (UTF-8, LF) |
+| D1 | data with quotes, spaces, backslashes | *(amended)* "Create the file `notes/summary.txt` whose entire content is the following line followed by one LF newline, byte for byte, UTF-8 without BOM: `She said "it's done" -- path C:\tmp\x y`" | file bytes `She said "it's done" -- path C:\tmp\x y\n` (UTF-8, LF, no BOM); a file with the right text but CRLF or a BOM is reported in its own column, neither correct nor an argument-usage error |
 | D2 | data with quotes, spaces, backslashes | "In `data/quotes.jsonl`, find the record whose `id` is 3 and reply with the exact value of its `name` field and nothing else." | `She said "it's done" -- path C:\tmp\x y` |
 
 `data/quotes.jsonl` is `docs/dogfood/shell_contract/data/quotes.jsonl` (5
 records; ids 3 and 4 carry quotes, apostrophes, backslashes, spaces, a
 trailing backslash; id 5 is empty).
+
+*(amended)* R2's answer is the digest of the file as `init_l2.sh` writes it
+to disk. It equals the git blob only because the seed carries
+`.gitattributes` with `* text eol=lf` and `init_l2.sh` initializes with
+`core.autocrlf=false` (lab check: CR count 0 on disk; the CRLF variant would
+hash to `53424d76…e03e`). Scoring uses the disk file of the run's own
+repository, never a blob hash from another machine; if either setting
+changes, the frozen answer is void.
 
 **Design.** 4 tasks × 2 arms × 10 repetitions = 80 runs, interleaved
 A,B,A,B per task so drift affects both arms alike. Budget `--max-turns 12`
@@ -130,18 +143,23 @@ and recorded. Scoring is mechanical from the SessionLog and the repository:
 | Outcome | Definition |
 |---|---|
 | correctness (primary) | R1/R2/D2: the final assistant text, trimmed, equals the correct result; D1: the file exists with exactly the expected bytes |
-| argument-usage error runs (primary) | a run with at least one of: `argv` collapse denial (`input needs an array field 'argv'`); standalone shell-operator rejection; a `python -c` or explicit-shell element whose stderr shows `SyntaxError: unterminated string literal` or `unexpected character after line continuation` (shell-reparse class); a result whose stderr shows the program received a different argument than intended (`No such file` on a path that exists) |
-| helper-file repair calls (primary) | tool calls that create, edit, or run a file the task did not ask for (scripts under `tests/`, `_check*.py`, redirect targets); counted per run |
-| invalid-Python runs (informational) | a run with a `SyntaxError` on a `python -c` program that is not of the shell-reparse class (compound statement after `;` etc.); not counted against either arm |
+| argument-usage error runs (primary) | a run with at least one of: `argv` collapse denial (`input needs an array field 'argv'`); standalone shell-operator rejection; *(amended)* a shell-reparse failure, defined mechanically as: argv invokes a shell (`cmd`, `powershell`, `pwsh`, `sh`, `bash`) and the child's stderr shows a Python `SyntaxError`, `can't open file`, or a command-not-found from a fragment of the element (the shell split or re-quoted the element); a result whose stderr shows the program received a different argument than intended (`No such file` on a path that exists) |
+| helper-file repair calls (primary) | tool calls that create, edit, read back, or run a file the task did not ask for (scripts under `tests/`, `_check*.py`, redirect targets); counted per run and *(amended)* reported per task as well as in total, since R1/R2/D2 are expected near zero in both arms and D1 decides this outcome |
+| invalid-Python runs (informational) | *(amended)* a run with a Python `SyntaxError` on a `python -c` program where argv invoked no shell (the echoed line is the sent element; compound statement after `;` etc.); not counted against either arm. Stage 1 confirmed this class is disjoint from shell re-parsing by the presence or absence of a shell in argv, not by the error text |
 | model calls, tool calls, denials, handshake announcements, ordering violations | as in the dogfood reports; kept in full |
 
 **Decision gate (proposed).** B is a stable improvement only if, over the
 40 runs per arm, (1) B's correct runs ≥ A's, and (2) B's argument-usage
-error runs ≤ half of A's, and (3) B's helper-file repair calls ≤ A's, with
-no task class where B is worse on (1). If A shows fewer than 4
+error runs ≤ ⌊A/2⌋ *(amended: A = 4 or 5 → B ≤ 2)*, and (3) B's helper-file
+repair calls ≤ A's in total and in no task class more than A's, with no
+task class where B is worse on (1). If A shows fewer than 4
 argument-usage error runs in total, the experiment cannot discriminate and
 is reported as such (not as "B has no effect"). Total call count is
 reported but never decides.
+
+*(amended)* Expected duration from L2-R2's mean of 5.75 s per model call:
+at most about 1.5 hours if every run used its 12 calls, likely 30–45
+minutes.
 
 **If B passes**, the next discussion is merging the description and a full
 task regression; **if B does not pass**, the candidate stops. Either way

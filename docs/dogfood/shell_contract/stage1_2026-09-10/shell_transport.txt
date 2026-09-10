@@ -1,0 +1,38 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running tests\shell_transport.rs (target\debug\deps\shell_transport-b46cba6dd44b8aed.exe)
+
+running 5 tests
+compound-statement observation:
+[stderr]
+  File "<string>", line 1
+    from datetime import datetime; T=datetime(2026,9,1); def job(n): return n
+                                                         ^^^
+SyntaxError: invalid syntax
+[exit 1]
+test compound_statement_after_semicolon_is_pythons_error_not_transports ... ok
+program observation:
+a b c"d e\f
+second line
+[exit 0]
+test program_text_with_quotes_and_backslashes_arrives_unchanged ... ok
+exact mode observation:
+["a b", "c\"d\"e", "e\\f", "it's", "--flag=x y", "", "trailing\\"]
+[exit 0]
+test payload_arrives_unchanged_in_exact_mode ... ok
+default mode observation:
+Captured: 20260910-193354-3a1929beca3d (exit 0):
+Warning: display-control characters in PROGRAM output were sanitized.
+PROGRAM data:
+L1 stdout: ["a b", "c\"d\"e", "e\\f", "it's", "--flag=x y", "", "trailing\\"]
+[exit 0]
+test payload_arrives_unchanged_in_default_mode ... ok
+cmd /C observation (is_error=true):
+[stderr]
+  File "<string>", line 1
+    "import
+    ^
+SyntaxError: unterminated string literal (detected at line 1)
+[exit 1]
+test cmd_slash_c_reparses_the_element_under_cmd_rules ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s

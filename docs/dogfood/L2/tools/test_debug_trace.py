@@ -98,6 +98,8 @@ class DebugTraceTests(unittest.TestCase):
         self.assertIn("call   2", out)
         self.assertNotIn("call   3", out)
         self.assertIn("model calls 4  tool calls 5", out)
+        # The summary is over the whole log, range or not.
+        self.assertIn("repeated identical calls 1  pira_ctx retrievals 1", out)
 
 
 if __name__ == "__main__":
