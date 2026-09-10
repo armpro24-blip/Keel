@@ -136,13 +136,15 @@ def helper_paths(tool, value, tracked, allowed):
         tokens.append(str(value.get("path", "")))
     found = set()
     for token in tokens:
-        norm = token.replace("\\", "/")
+        norm = re.sub(r"/+", "/", token.replace("\\", "/"))
         if norm.startswith("./"):
             norm = norm[2:]
         base = norm.rsplit("/", 1)[-1]
         if norm in allowed or base in {a.rsplit("/", 1)[-1] for a in allowed}:
             continue
-        if tracked is not None and (norm in tracked or any(t.endswith("/" + norm) or t == norm for t in tracked)):
+        # An absolute path (drive letter dropped by the token regex, so it
+        # starts with "/Users/…") names a tracked file when it ends with it.
+        if tracked is not None and any(norm == t or norm.endswith("/" + t) for t in tracked):
             continue
         found.add(norm)
     return found

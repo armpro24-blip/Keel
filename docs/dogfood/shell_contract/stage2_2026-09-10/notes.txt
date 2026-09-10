@@ -1,0 +1,98 @@
+--- R1-A-1 (scorer rc=0)
+--- R1-B-1 (scorer rc=0)
+--- R1-B-2 (scorer rc=0)
+--- R1-A-2 (scorer rc=0)
+--- R1-A-3 (scorer rc=0)
+--- R1-B-3 (scorer rc=0)
+--- R1-B-4 (scorer rc=0)
+--- R1-A-4 (scorer rc=0)
+--- R1-A-5 (scorer rc=0)
+--- R1-B-5 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- R1-B-6 (scorer rc=0)
+--- R1-A-6 (scorer rc=0)
+--- R1-A-7 (scorer rc=0)
+--- R1-B-7 (scorer rc=0)
+--- R1-B-8 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- R1-A-8 (scorer rc=0)
+--- R1-A-9 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+  arg_error structural: input needs an array field 'argv'
+--- R1-B-9 (scorer rc=0)
+--- R1-B-10 (scorer rc=0)
+--- R1-A-10 (scorer rc=0)
+--- R2-A-1 (scorer rc=0)
+--- R2-B-1 (scorer rc=0)
+--- R2-B-2 (scorer rc=0)
+--- R2-A-2 (scorer rc=0)
+--- R2-A-3 (scorer rc=0)
+--- R2-B-3 (scorer rc=0)
+--- R2-B-4 (scorer rc=0)
+--- R2-A-4 (scorer rc=0)
+--- R2-A-5 (scorer rc=0)
+--- R2-B-5 (scorer rc=0)
+--- R2-B-6 (scorer rc=0)
+--- R2-A-6 (scorer rc=0)
+--- R2-A-7 (scorer rc=0)
+--- R2-B-7 (scorer rc=0)
+--- R2-B-8 (scorer rc=0)
+--- R2-A-8 (scorer rc=0)
+--- R2-A-9 (scorer rc=0)
+--- R2-B-9 (scorer rc=0)
+--- R2-B-10 (scorer rc=0)
+--- R2-A-10 (scorer rc=0)
+--- D1-A-1 (scorer rc=0)
+--- D1-B-1 (scorer rc=0)
+--- D1-B-2 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D1-A-2 (scorer rc=0)
+--- D1-A-3 (scorer rc=0)
+--- D1-B-3 (scorer rc=0)
+--- D1-B-4 (scorer rc=0)
+--- D1-A-4 (scorer rc=0)
+--- D1-A-5 (scorer rc=0)
+--- D1-B-5 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D1-B-6 (scorer rc=0)
+--- D1-A-6 (scorer rc=0)
+--- D1-A-7 (scorer rc=0)
+--- D1-B-7 (scorer rc=0)
+--- D1-B-8 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+  arg_error structural: input needs an array field 'argv'
+--- D1-A-8 (scorer rc=0)
+--- D1-A-9 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D1-B-9 (scorer rc=0)
+--- D1-B-10 (scorer rc=0)
+--- D1-A-10 (scorer rc=0)
+--- D2-A-1 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D2-B-1 (scorer rc=0)
+--- D2-B-2 (scorer rc=0)
+--- D2-A-2 (scorer rc=0)
+--- D2-A-3 (scorer rc=0)
+--- D2-B-3 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+  arg_error structural: input needs an array field 'argv'
+--- D2-B-4 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D2-A-4 (scorer rc=0)
+--- D2-A-5 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D2-B-5 (scorer rc=0)
+--- D2-B-6 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+  arg_error structural: input needs an array field 'argv'
+--- D2-A-6 (scorer rc=0)
+--- D2-A-7 (scorer rc=0)
+--- D2-B-7 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D2-B-8 (scorer rc=0)
+--- D2-A-8 (scorer rc=0)
+--- D2-A-9 (scorer rc=0)
+  arg_error structural: input needs an array field 'argv'
+--- D2-B-9 (scorer rc=0)
+--- D2-B-10 (scorer rc=0)
+--- D2-A-10 (scorer rc=0)

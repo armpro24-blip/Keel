@@ -1,0 +1,560 @@
+--- R1-A-1
+decisions 8  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-1
+decisions 4  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-2
+decisions 5  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-2
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-3
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-3
+decisions 6  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-4
+decisions 10  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-4
+decisions 4  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-5
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-5
+decisions 6  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-6
+decisions 5  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-6
+decisions 5  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-7
+decisions 10  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-7
+decisions 8  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-8
+decisions 6  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-8
+decisions 12  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-9
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-9
+decisions 9  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-B-10
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R1-A-10
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-1
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-1
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-2
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-2
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-3
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-3
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-4
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-4
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-5
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-5
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-6
+decisions 4  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-6
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-7
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-7
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-8
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-8
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-9
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-9
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-B-10
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- R2-A-10
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-1
+decisions 5  state-changing proposed 3
+allowed state-changing with review 3
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 3  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-1
+decisions 7  state-changing proposed 4
+allowed state-changing with review 4
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 4  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-2
+decisions 7  state-changing proposed 4
+allowed state-changing with review 4
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 4  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-2
+decisions 6  state-changing proposed 2
+allowed state-changing with review 2
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 2  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-3
+decisions 3  state-changing proposed 2
+allowed state-changing with review 2
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 2  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-3
+decisions 10  state-changing proposed 7
+allowed state-changing with review 7
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 7  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-4
+decisions 9  state-changing proposed 6
+allowed state-changing with review 5
+denied for missing review 1  recovered 1
+Safety: announcements in transcript 5  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-4
+decisions 10  state-changing proposed 5
+allowed state-changing with review 4
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 4  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-5
+decisions 3  state-changing proposed 2
+allowed state-changing with review 2
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 2  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-5
+decisions 6  state-changing proposed 3
+allowed state-changing with review 3
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 3  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-6
+decisions 11  state-changing proposed 7
+allowed state-changing with review 7
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 7  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-6
+decisions 3  state-changing proposed 2
+allowed state-changing with review 2
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 2  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-7
+decisions 6  state-changing proposed 2
+allowed state-changing with review 2
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 2  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-7
+decisions 5  state-changing proposed 3
+allowed state-changing with review 2
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 2  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-8
+decisions 8  state-changing proposed 4
+allowed state-changing with review 3
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 3  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-8
+decisions 6  state-changing proposed 4
+allowed state-changing with review 4
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 4  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-9
+decisions 12  state-changing proposed 5
+allowed state-changing with review 5
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 5  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-9
+decisions 2  state-changing proposed 1
+allowed state-changing with review 1
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 1  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-B-10
+decisions 2  state-changing proposed 1
+allowed state-changing with review 1
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 1  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D1-A-10
+decisions 4  state-changing proposed 2
+allowed state-changing with review 2
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 2  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-1
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-1
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-2
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-2
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-3
+decisions 4  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-3
+decisions 4  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-4
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-4
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-5
+decisions 5  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-5
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-6
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-6
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-7
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-7
+decisions 4  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-8
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-8
+decisions 1  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-9
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-9
+decisions 3  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-B-10
+decisions 2  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0
+--- D2-A-10
+decisions 4  state-changing proposed 0
+allowed state-changing with review 0
+denied for missing review 0  recovered 0
+Safety: announcements in transcript 0  (expected == allowed state-changing with review in full mode)
+approve? prompts in transcript 0  outside-workspace markers 0
+decision->result ordering violations 0

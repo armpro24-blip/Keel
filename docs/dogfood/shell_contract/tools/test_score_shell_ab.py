@@ -119,6 +119,16 @@ class ScoreTests(unittest.TestCase):
         end, correct, file_correct, line_ending, *_ = s.score(events("done", {"event": "run_end", "turns": 2}), "D1", self.repo)
         self.assertEqual((end, correct, file_correct, line_ending), ("completion", False, False, True))
 
+    def test_absolute_and_doubled_paths_to_tracked_files_are_not_helpers(self):
+        # the stage-2 delivery showed both shapes counted as helpers: an absolute
+        # Windows path with the drive letter dropped, and a doubled slash
+        calls = [
+            ("shell", {"argv": ["python", "-c", "open(r'C:\\Users\\LM\\Desktop\\t25\\R2-B-6\\a.py'); open('./a.py'); open('.//a.py')"]}, "[exit 0]"),
+        ]
+        *_, counts, helpers, _, _ = s.score(events("42", {"event": "run_end", "turns": 2}, calls), "R1", self.repo)
+        self.assertEqual(helpers, [])
+        self.assertEqual(counts["helper_calls"], 0)
+
     def test_helper_paths_exclude_task_files(self):
         calls = [("shell", {"argv": ["python", "-c", "open('data/quotes.jsonl'); open('tests/_check.py')"]}, "[exit 0]")]
         *_, counts, helpers, _, _ = s.score(events(s.EXPECTED["D2"], {"event": "run_end", "turns": 2}, calls), "D2", self.repo)

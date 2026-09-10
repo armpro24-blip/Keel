@@ -1,0 +1,81 @@
+task,arm,run,end,correct,file_correct,line_ending,model_calls,tool_calls,arg_errors,prog_errors,undetermined,helper_calls,denials_review,sc_with_review,helper_paths,final_text
+R1,A,1,completion,True,,,6,8,0,0,0,1,0,0,f.py,42
+R1,B,1,completion,False,,,5,4,0,0,0,0,0,0,,8
+R1,B,2,completion,True,,,6,5,0,0,0,0,0,0,,42
+R1,A,2,completion,True,,,4,3,0,0,0,0,0,0,,42
+R1,A,3,completion,True,,,4,3,0,0,0,0,0,0,,42
+R1,B,3,completion,True,,,7,6,0,0,0,0,0,0,,42
+R1,B,4,completion,True,,,10,10,0,0,0,0,0,0,,42
+R1,A,4,completion,True,,,4,4,0,0,0,0,0,0,,42
+R1,A,5,completion,True,,,3,2,0,0,0,0,0,0,,42
+R1,B,5,completion,True,,,7,6,1,0,0,0,0,0,,42
+R1,B,6,completion,True,,,6,5,0,0,0,0,0,0,,42
+R1,A,6,completion,True,,,6,5,0,0,0,0,0,0,,42
+R1,A,7,completion,True,,,11,11,0,2,0,0,0,0,,42
+R1,B,7,completion,True,,,9,8,0,0,0,4,0,0,/Users/LM/Desktop/t25/R1-B-7/tests/test_cli.py;/Users/LM/Desktop/t25/R1-B-7/tests/test_events.py;/Users/LM/Desktop/t25/R1-B-7/tests/test_report.py;/Users/LM/Desktop/t25/R1-B-7/tests/test_state.py;/Users/LM/Desktop/t25/R1-B-7/tests/test_timeutil.py,42
+R1,B,8,completion,True,,,7,6,1,0,0,0,0,0,,42
+R1,A,8,completion,True,,,12,12,0,0,0,0,0,0,,42
+R1,A,9,completion,True,,,4,3,2,0,0,0,0,0,,42
+R1,B,9,completion,True,,,6,9,0,0,0,0,0,0,,42
+R1,B,10,completion,True,,,4,3,0,0,0,0,0,0,,42
+R1,A,10,completion,True,,,3,2,0,0,0,0,0,0,,42
+R2,A,1,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,1,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,2,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,2,completion,False,,,2,1,0,0,0,0,0,0,,The SHA-256 digest is:\n\n```\n25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44\n```
+R2,A,3,completion,True,,,2,1,0,0,0,1,0,0,/Users/LM/Desktop/t25/R2-A-3/queuewatch/report.py,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,3,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,4,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,4,completion,True,,,3,2,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,5,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,5,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,6,completion,True,,,5,4,0,0,0,3,0,0,/Users/LM/Desktop/t25/R2-B-6/queuewatch/report.py;queuewatch//report.py,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,6,completion,True,,,3,2,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,7,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,7,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,8,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,8,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,9,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,9,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,B,10,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+R2,A,10,completion,True,,,2,1,0,0,0,0,0,0,,25ba9483d9cf0c91b81cd8d6576d2df3f04eff7340157269172891b2d51c1a44
+D1,A,1,completion,True,True,False,6,5,0,0,0,0,0,3,,Done. `notes/summary.txt` now contains exactly the required 40 bytes: the line text followed by a single LF， UTF-8 witho
+D1,B,1,completion,True,True,False,8,7,0,0,0,0,0,4,,File `notes/summary.txt` is correct:\n\n- 40 bytes， no BOM， UTF-8\n- Content: `She said "it's done" -- path C:\tmp\x y` + L
+D1,B,2,completion,True,True,False,8,7,1,0,0,0,0,4,,File created and verified:\n\n- **Path:** `notes/summary.txt`\n- **Size:** 40 bytes\n- **Bytes:** `53 68 65 20 73 61 69 64 2
+D1,A,2,completion,True,True,False,6,6,0,0,0,0,0,2,,Done. `notes/summary.txt` is exactly 40 bytes — the requested line followed by a single LF (`0A`)， no BOM， no CRLF.
+D1,A,3,completion,False,False,False,4,3,0,0,0,0,0,2,,Created `notes/summary.txt` (39 bytes). The content is:\n\n```\nShe said "it's done" -- path C:\tmp\x y\n```\n\nfollowed by ex
+D1,B,3,completion,True,True,False,11,10,0,1,0,0,0,7,,Done. `notes/summary.txt` is exactly 40 bytes: the specified line (39 characters) followed by a single LF byte (0x0A)， U
+D1,B,4,completion,True,True,False,10,9,0,0,0,0,1,5,,File `notes/summary.txt` created. Verified byte-for-byte: 40 bytes， UTF-8 without BOM， ends with exactly one LF (`0A`). 
+D1,A,4,completion,True,True,False,9,10,0,0,0,0,0,4,,`notes/summary.txt` is created and verified — 40 bytes: the 39-character line followed by exactly one `0x0A` (LF). UTF-8
+D1,A,5,completion,False,False,True,4,3,0,0,0,0,0,2,,Created `notes/summary.txt`. Hex dump confirms exact content — 44 bytes， UTF-8 without BOM， ending with a single LF (`0A
+D1,B,5,completion,True,True,False,7,6,1,0,0,0,0,3,,Done. `notes/summary.txt` has been created with the exact content:\n\n- **40 bytes**， UTF-8， no BOM\n- Ends with a single L
+D1,B,6,completion,True,True,False,12,11,0,2,0,0,0,7,,That certutil command was irrelevant — the hex dump already confirmed everything is correct. The file is created and ver
+D1,A,6,completion,True,True,False,4,3,0,0,0,0,0,2,,Done. `notes/summary.txt` has been created with exactly the specified content (39 bytes of text + 1 LF byte， no BOM). He
+D1,A,7,completion,True,True,False,7,6,0,0,0,0,0,2,,Done. `notes/summary.txt` contains exactly:\n\n```\nShe said "it's done" -- path C:\tmp\x y\n\n```\n\n39 bytes total， UTF-8 wi
+D1,B,7,completion,True,True,False,6,5,0,0,0,0,0,2,,Done. `notes/summary.txt` contains exactly:\n\n```\nShe said "it's done" -- path C:\tmp\x y\n\n```\n\n40 bytes， UTF-8， no BOM，
+D1,B,8,completion,True,True,False,9,8,2,0,0,1,0,3,notes/create.py,Done. The file `notes/summary.txt` has been created with the exact 40 bytes:\n\n```\nShe said "it's done" -- path C:\tmp\x 
+D1,A,8,completion,True,True,False,7,6,0,0,0,0,0,4,,Done. The file `notes/summary.txt` has been created with exactly:\n\n```\nShe said "it's done" -- path C:\tmp\x y\n```\n\nfoll
+D1,A,9,budget,False,False,False,12,12,1,0,0,0,0,5,,
+D1,B,9,completion,True,True,False,3,2,0,0,0,0,0,1,,`notes/summary.txt` created. Hex verification confirms the content is exactly:\n\n```\nShe said "it's done" -- path C:\tmp\
+D1,B,10,completion,True,True,False,3,2,0,0,0,0,0,1,,File created at `notes/summary.txt` — 40 bytes， UTF-8 without BOM， content matches the required line exactly with a trai
+D1,A,10,completion,True,True,False,5,4,0,0,0,0,0,2,,Done. `notes/summary.txt` is 40 bytes， UTF-8 without BOM， containing:\n\n```\nShe said "it's done" -- path C:\tmp\x y\n```\nf
+D2,A,1,completion,False,,,4,3,1,0,0,0,0,0,,The name field for id 3 is: `She said "it's done" -- path C:\tmp\x y`
+D2,B,1,completion,True,,,2,1,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,2,completion,True,,,2,1,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,2,completion,True,,,3,2,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,3,completion,True,,,5,4,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,3,completion,True,,,5,4,2,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,4,completion,True,,,4,3,1,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,4,completion,True,,,3,2,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,5,completion,True,,,6,5,1,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,5,completion,True,,,3,2,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,6,completion,True,,,4,3,2,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,6,completion,True,,,2,1,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,7,completion,False,,,3,2,0,0,0,0,0,0,,`She said "it's done" -- path C:\tmp\x y`
+D2,B,7,completion,True,,,5,4,1,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,8,completion,True,,,3,2,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,8,completion,True,,,2,1,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,9,completion,True,,,4,3,1,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,9,completion,True,,,4,3,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,B,10,completion,True,,,3,2,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y
+D2,A,10,completion,True,,,5,4,0,0,0,0,0,0,,She said "it's done" -- path C:\tmp\x y

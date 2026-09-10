@@ -1,10 +1,16 @@
 # Shell-tool argument contract: transport check, then a description A/B (T25)
 
-Status: **stage 1 complete 2026-09-10 on both machines, transport not at
-fault (`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`); stage 2 (A/B)
-approved by the user on 2026-09-10 for exactly one run after the three
-revisions below were frozen (B text, error classification, budget and
-correctness rules). Expectations for the candidate are lowered: much of what
+Status: **complete. Stage 1: transport not at fault
+(`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`). Stage 2 run once,
+80/80, 2026-09-10: B did not reach the candidate-advancement threshold
+(condition 1 fails on R1, condition 2 fails outright with B 9 vs A 5
+argument-error runs, condition 3 fails on D1); the candidate stops, the
+description is not merged, `exp/shell-contract-b` stays as the record
+(`docs/evidence/SHELL_CONTRACT_AB_2026-09-10.md`). All 18 confirmed
+argument errors were `argv` sent as a string; the shell re-parsing class B
+addressed produced zero events.** Stage 2 had been approved by the user on
+2026-09-10 for exactly one run after the three revisions below were frozen
+(B text, error classification, budget and correctness rules). Expectations for the candidate are lowered: much of what
 looked like quoting trouble was invalid one-line Python written by the
 model.** Decision (user, 2026-09-10) after
 the T24 audit: the candidate is to clarify the `shell` tool's
