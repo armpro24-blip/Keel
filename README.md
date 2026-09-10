@@ -130,7 +130,10 @@ investigation (T15) on 2026-09-07. Evidence: `docs/evidence/T15_*`.
 ```text
 cargo test
 keel pira check --lock
-OPENAI_API_KEY=... cargo run -- --model <model-name> [--trace] [--full]
+OPENAI_API_KEY=... cargo run -- --model <model-name> [--trace]
+OPENAI_API_KEY=... cargo run -- --model <model-name> --full --max-turns 64
+OPENAI_API_KEY=... cargo run -- --model <model-name> --record-wire
+keel --help                    # all flags and their descriptions
 ```
 
 `OPENAI_BASE_URL` overrides the endpoint for OpenAI-compatible servers,
@@ -139,6 +142,10 @@ vLLM / llama.cpp server). Such servers usually ignore the key, but
 `OPENAI_API_KEY` must still be set to some placeholder. The model name has no
 default; pass `--model` or set `OPENAI_MODEL`. The REPL requires a readable,
 compatible PIRA installation at `~/agent`.
+
+`--record-wire` is the opt-in diagnostic capture described in the M3 paragraph above; read its privacy caveat there.
+
+`--max-turns` bounds the model calls spent on one user message (default 32, legal range 1–1000). The count restarts with each user message. When it is exhausted the run stops with an explicit error ("model-call budget exhausted (max_turns = N); the run is incomplete; the transcript is kept"), the transcript is kept, and nothing is resent. There is no unlimited setting.
 
 ## License
 
