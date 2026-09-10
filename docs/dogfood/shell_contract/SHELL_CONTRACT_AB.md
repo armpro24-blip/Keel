@@ -1,8 +1,12 @@
 # Shell-tool argument contract: transport check, then a description A/B (T25)
 
 Status: **stage 1 complete 2026-09-10 on both machines, transport not at
-fault (`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`); stage 2 (A/B) is an
-amended draft for review after the lab's comments, not approved to run.** Decision (user, 2026-09-10) after
+fault (`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`); stage 2 (A/B)
+approved by the user on 2026-09-10 for exactly one run after the three
+revisions below were frozen (B text, error classification, budget and
+correctness rules). Expectations for the candidate are lowered: much of what
+looked like quoting trouble was invalid one-line Python written by the
+model.** Decision (user, 2026-09-10) after
 the T24 audit: the candidate is to clarify the `shell` tool's
 argument-passing contract in its description. No new tool, no change to
 execution semantics, no full L2 rerun. The candidate is not expected to fix
@@ -73,10 +77,12 @@ same observations; `cmd /C` reproduces the `"import` unterminated-string
 failure on both; the four L2-R2 calls are all invalid one-line Python
 (`docs/evidence/SHELL_TRANSPORT_2026-09-10.md`). Stop rule not triggered.
 
-## Stage 2 (amended draft for review): A/B on the `shell` description
+## Stage 2 (frozen 2026-09-10, one run approved): A/B on the `shell` description
 
-Not approved to run. Every number below is a proposal for the reviewer.
-Amendments after the lab's stage-1 comments are marked *(amended)*.
+Amendments after the lab's stage-1 comments are marked *(amended)*; the
+user's three revisions before approval are marked *(revised)*. B is
+`exp/shell-contract-b`, one commit on top of `main` changing only the
+description string in `src/shell.rs`; `cargo test` passes there.
 
 **Arms.** A: the current description (`src/shell.rs` at `822fdbc`). B: the
 clarified description below. B lives on an experiment branch that changes
@@ -85,21 +91,22 @@ else differs: model `nvidia/Qwen3.6-35B-A3B-NVFP4` on the audited serving
 configuration, no sampling parameters, PIRA `4e0682dd`, `--full --trace
 --record-wire --max-turns 12`, fresh repository per run.
 
-**B text (proposed; final wording is part of the review):**
+**B text (frozen; identical to the string on `exp/shell-contract-b`):**
 
 > Run a program with arguments. argv is executed directly, with no shell:
 > argv[0] is the program and every other element is one argument, delivered
 > to the program exactly as written. Do not add quotes that only a shell
 > would remove (write `["python", "-c", "print('hi')"]`, not
 > `["python", "-c", "\"print('hi')\""]`); quotes, spaces, backslashes, and
-> newlines that belong to the argument's content stay in it; this holds
-> just the same when the program text itself contains quotes. Redirection,
+> newlines that belong to the argument's content stay in it. Redirection,
 > pipes, and && are shell features: as standalone argv elements they are
 > rejected; they work only inside the command element of an explicitly
 > invoked shell. If you need a shell, {shell_hint}; the element after its
 > command flag is then parsed by that shell under its own quoting rules,
-> not by Keel. workdir sets the process's working directory only; it does
-> not change how the program itself resolves modules or relative paths.
+> not by Keel. workdir sets the child process's current working directory.
+> Relative paths and module imports are then resolved according to that
+> program's own rules. *(revised: the earlier "does not change … relative
+> paths" could be read as "the working directory does not matter")*
 > Provide the actual command in argv and its purpose in the top-level intent
 > field. For ordinary commands, Keel automatically runs argv through
 > pira_ctx; do not wrap ordinary commands in pira_ctx yourself. Invoke a
@@ -134,37 +141,48 @@ hash to `53424d76…e03e`). Scoring uses the disk file of the run's own
 repository, never a blob hash from another machine; if either setting
 changes, the frozen answer is void.
 
-**Design.** 4 tasks × 2 arms × 10 repetitions = 80 runs, interleaved
-A,B,A,B per task so drift affects both arms alike. Budget `--max-turns 12`
-per run; a run that exhausts it is a failed run for correctness. Zero
-Continue, no retry, no hint; a question is answered only from the task text
-and recorded. Scoring is mechanical from the SessionLog and the repository:
+**Design.** 4 tasks × 2 arms × 10 repetitions = 80 runs, at most 960
+model calls in total (the "about 1.5 hours" is an estimate, not a limit).
+*(revised)* Within each task the 10 pairs alternate order, AB, BA, AB, BA,
+…, so neither arm always runs first. Budget `--max-turns 12` per run; a run
+that exhausts it is incomplete. Zero Continue, no retry, no hint.
+*(revised)* **A question from the model is not answered**: it ends the run
+as incomplete and the question text is kept, because an answer would start
+a new count and the runs would no longer share one budget. Scoring is
+mechanical from the SessionLog and the repository
+(`tools/score_shell_ab.py`, one CSV row per run; self-check
+`tools/test_score_shell_ab.py`):
 
 | Outcome | Definition |
 |---|---|
-| correctness (primary) | R1/R2/D2: the final assistant text, trimmed, equals the correct result; D1: the file exists with exactly the expected bytes |
-| argument-usage error runs (primary) | a run with at least one of: `argv` collapse denial (`input needs an array field 'argv'`); standalone shell-operator rejection; *(amended)* a shell-reparse failure, defined mechanically as: argv invokes a shell (`cmd`, `powershell`, `pwsh`, `sh`, `bash`) and the child's stderr shows a Python `SyntaxError`, `can't open file`, or a command-not-found from a fragment of the element (the shell split or re-quoted the element); a result whose stderr shows the program received a different argument than intended (`No such file` on a path that exists) |
-| helper-file repair calls (primary) | tool calls that create, edit, read back, or run a file the task did not ask for (scripts under `tests/`, `_check*.py`, redirect targets); counted per run and *(amended)* reported per task as well as in total, since R1/R2/D2 are expected near zero in both arms and D1 decides this outcome |
-| invalid-Python runs (informational) | *(amended)* a run with a Python `SyntaxError` on a `python -c` program where argv invoked no shell (the echoed line is the sent element; compound statement after `;` etc.); not counted against either arm. Stage 1 confirmed this class is disjoint from shell re-parsing by the presence or absence of a shell in argv, not by the error text |
+| correctness (primary) | *(revised)* the run **completed normally** (final text, no error, budget not exhausted) **and** the result check passes: R1/R2/D2 the final text, trimmed, equals the correct result; D1 the file has exactly the expected bytes. D1 with a correct file but an exhausted budget is reported as "file correct, run incomplete" and is not a correct run |
+| confirmed argument-usage errors (primary) | *(revised)* structural denials (`input needs an array field 'argv'`; a standalone shell operator rejected) and **output evidence** that an explicitly invoked shell changed or split an element: Python's traceback echoes a line that is not a line of any sent argv element (for example `"import`), or `can't open file` after a shell. "Shell invoked + SyntaxError" alone proves nothing: invalid Python stays invalid Python through a shell |
+| program's own errors (reported, not an argument error) | *(revised)* a Python `SyntaxError` whose echoed line is a line of a sent element, with or without a shell (a compound statement after `;`, an inner `exec` string, …). Not counted against either arm as an argument error, but it costs calls and can cost correctness, and both are reported per arm |
+| undetermined (reported) | *(revised)* a `SyntaxError` with no echoed line to compare. Never folded into the confirmed class |
+| helper-file related calls (primary) | *(revised: renamed; creating a helper is not an error)* tool calls naming a file the task did not ask for and the seed does not track (scripts under `tests/`, `_check*.py`, redirect targets); counted per run, the paths listed for hand review, and *(amended)* reported per task as well as in total |
 | model calls, tool calls, denials, handshake announcements, ordering violations | as in the dogfood reports; kept in full |
 
-**Decision gate (proposed).** B is a stable improvement only if, over the
-40 runs per arm, (1) B's correct runs ≥ A's, and (2) B's argument-usage
-error runs ≤ ⌊A/2⌋ *(amended: A = 4 or 5 → B ≤ 2)*, and (3) B's helper-file
-repair calls ≤ A's in total and in no task class more than A's, with no
-task class where B is worse on (1). If A shows fewer than 4
-argument-usage error runs in total, the experiment cannot discriminate and
-is reported as such (not as "B has no effect"). Total call count is
-reported but never decides.
+**Candidate-advancement threshold (frozen).** *(revised: this is the
+preregistered threshold for taking the candidate to the next discussion,
+not a claim of general stable improvement; the sample supports the former,
+not the latter.)* B reaches it only if, over the 40 runs per arm,
+(1) B's correct runs ≥ A's, and in no task fewer than A's; (2) A shows at
+least 4 runs with a confirmed argument-usage error and B shows ≤ ⌊A/2⌋
+such runs *(A = 4 or 5 → B ≤ 2)*; (3) B's helper-file related calls do not
+exceed A's, in total or in any task. If A shows fewer than 4 confirmed
+argument-usage error runs the experiment cannot discriminate and is
+reported as such; **no samples are added to reach the threshold**. Total
+call count is reported but never decides.
 
 *(amended)* Expected duration from L2-R2's mean of 5.75 s per model call:
 at most about 1.5 hours if every run used its 12 calls, likely 30–45
 minutes.
 
-**If B passes**, the next discussion is merging the description and a full
-task regression; **if B does not pass**, the candidate stops. Either way
-the L2-R2 result, the budget of 100, and the frozen acceptance stay as
-they are.
+**If B reaches the threshold**, the next discussion is merging the
+description and a full task regression; **if not**, the candidate stops.
+Either way the L2-R2 result, the budget of 100, and the frozen acceptance
+stay as they are. Nothing in the runtime and nothing in the tasks is
+changed to raise the error rate; after the 80 runs the experiment stops.
 
 ## Reporting
 
