@@ -1,0 +1,5 @@
+{"id": 1, "name": "plain", "note": "no special characters"}
+{"id": 2, "name": "with space", "note": "one space inside"}
+{"id": 3, "name": "She said \"it's done\" -- path C:\\tmp\\x y", "note": "quotes, apostrophe, backslashes, spaces"}
+{"id": 4, "name": "trailing backslash\\", "note": "ends with a backslash"}
+{"id": 5, "name": "", "note": "empty"}
