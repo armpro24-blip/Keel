@@ -118,3 +118,7 @@ step-2 script output for both sessions, the step-3 reading with citations,
 and the classification with its remaining uncertainty. Then stop. L2-R2 is
 not approved until the audit is reviewed; the L2-R1 result (10/13,
 incomplete) stands permanently regardless of any later run.
+
+Review outcome (user, 2026-09-10): audit accepted; one L2-R2 run approved
+under the protocol in `README.md`, section "L2-R2", with no change to Keel,
+PIRA, model, or serving stack.

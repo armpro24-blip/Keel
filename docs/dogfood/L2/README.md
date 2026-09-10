@@ -239,6 +239,114 @@ the result; it is evidence about the task and the model's call efficiency,
 not a reason to raise N afterwards. Report: `docs/evidence/L2R1_<date>.md`;
 stop for review.
 
+## L2-R2: one repetition of L2-R1 after the tool-protocol audit
+
+Approved by the user on 2026-09-10 for **exactly one run**. L2-R1 ended at
+model call 40 with an empty response that the audit
+(`docs/evidence/TOOL_PROTOCOL_AUDIT_2026-09-09.md`) classified as model
+output non-compliant with the template; nothing in Keel, PIRA, the model, or
+the serving stack was changed as a result. L2-R2 therefore repeats L2-R1
+unchanged, as a second sample under the same conditions. It does not replace
+L2-R1: the L2-R1 result (10/13, incomplete) stands permanently, and the two
+runs are reported as a sequence, never as "the run that counts".
+
+Frozen values (the run does not start if any differs; stop before sending
+the task and report the mismatch):
+
+```text
+seed / task / acceptance / preservation:  unchanged (seed 5d668de, tree c050c5d, frozen/task.md, 13 checks, 42 IDs)
+repository:    a fresh directory, ~/Desktop/queuewatch-l2r2, created by init_l2.sh; nothing reused from L2 or L2-R1
+Keel runtime:  822fdbc (git log -1 --format=%h -- src tests Cargo.toml Cargo.lock); cargo test 15 suites
+Keel HEAD:     the tip of main that contains this section (later doc-only commits do not change the runtime)
+PIRA:          4e0682dd745f1dbafa772d9c11b369132db4c1a8 at ~/agent (AGENTS.md sha256 e6c7d630…)
+model:         nvidia/Qwen3.6-35B-A3B-NVFP4, snapshot 1355db6a052410cfd62085d94b58866fd0f2c3c5
+vLLM:          0.26.0, image vllm/vllm-openai:v0.26.0, build ffd46bfab2128bb84146050e98b51a617c6575ab
+parsers:       --reasoning-parser qwen3 --tool-call-parser qwen3_xml --enable-auto-tool-choice; no --chat-template
+template:      the weights' chat_template.jinja, sha256 e84f32a23fdda27689f868aa4a1a5621f41133e51a48d7f3efcbea2839574259
+sampling:      Keel sends no sampling parameters (request body keys: model, messages, tools);
+               the model's generation_config.json applies, sha256 e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e
+               (do_sample true, temperature 1.0, top_k 20, top_p 0.95)
+mode / flags:  --full --trace --record-wire --max-turns 100
+Continue:      none. No retry, no added budget, no second run whatever the outcome.
+```
+
+The budget basis is L2-R1's, unchanged: at most 100 model calls
+pre-authorized for the single task as an experimental resource allowance,
+not a prediction and not a fitted threshold.
+
+Procedure (differences from L2-R1 only; everything else, including the
+metrics snapshots, is as in L2 and L2-R1):
+
+1. **Keel host.** Step 1 of L2 plus `git log -1 --format=%h -- src tests
+   Cargo.toml Cargo.lock` = `822fdbc`; `curl -s http://192.168.3.103:8000/v1/models`
+   must show `nvidia/Qwen3.6-35B-A3B-NVFP4` with `max_model_len` 262144.
+2. **Serving host (read-only, same access the lab used for the audit).**
+   Run `docs/dogfood/L2/audit_2026-09-09/probes/step1b_fix.sh` inside the
+   vLLM container and keep its output as `~/Desktop/l2r2_serving.txt`; it
+   must show the snapshot and the two sha256 values above. Also record the
+   container's argv (`tr '\0' '\n' < /proc/1/cmdline`) and
+   `VLLM_IMAGE_TAG` / `VLLM_BUILD_COMMIT` from `/proc/1/environ`; the
+   parsers, the absence of `--chat-template`, the image tag and the build
+   commit must match. Do not restart, reconfigure, or send inference to the
+   server for this check.
+3. `bash <Keel>/docs/dogfood/L2/init_l2.sh ~/Desktop/queuewatch-l2r2`
+   (commit `5d668de`, 42 tests OK), then
+   `seed_test_preservation.py ~/Desktop/queuewatch-l2r2` → 42/42, 0 added.
+4. Start `keel --model "nvidia/Qwen3.6-35B-A3B-NVFP4" --trace --record-wire
+   --full --max-turns 100 2>&1 | tee ~/Desktop/l2r2_session.txt`; the banner
+   `[max_turns] 100 per user message` must appear before the task is sent.
+   Send `frozen/task.md` as one line (sha256 of the sent line must equal
+   L2-R1's `41459af6…`).
+5. Operator rules as in L2-R1: no hints, corrections, commands, or
+   `Continue`. The run ends when the model declares completion, when Keel
+   reports an error (empty response, provider error, or any other), or when
+   the budget is exhausted; in each case send `/quit` and record the time.
+   A question from the model is answered only from the frozen text and is
+   recorded as a human intervention that starts a new count, after which the
+   result can no longer be called one autonomous 100-call run. An `approve?`
+   prompt (outside-workspace only) gets `n` and is recorded. Nothing is
+   retried and no budget is added, whatever the reason for ending.
+6. Afterwards, **whatever the outcome**, the full step 6 of L2 with the
+   `l2r2_` file names (diff, project suite, hidden acceptance, preservation,
+   `session_stats.py`, `usage_from_wire.py`, `full_mode_check.py`,
+   `metrics_delta.py`, `pira_ctx history`, `keel log show`), plus two checks
+   pre-registered here:
+
+   ```bash
+   python -c "import json,sys; b=json.loads(open(sys.argv[1],encoding='utf-8').readline())['body']; print(sorted(b))" "<[wire] path>"
+   #   expected: ['messages', 'model', 'tools']  (no sampling parameters were sent)
+   python <Keel>/docs/dogfood/L2/tools/audit_tool_protocol.py "<[wire] path>"
+   #   structure only; classifies any empty response against the audit's signature
+   ```
+
+   Leave the repository uncommitted as the model left it; the wire file
+   stays on the machine.
+
+Pre-registered evidence: as for L2-R1, plus the serving-host record of step
+2, the request-body key check, and the `audit_tool_protocol.py` summary. The
+report states the end reason (declared completion / Keel error, quoted / budget
+exhausted), the number of model calls, the full-mode handshake result for
+every state-changing action, and every human intervention with time and
+text, whatever the outcome.
+
+Interpretation, fixed in advance:
+
+- Completion with acceptance 13/13 and preservation 42/42 under 100 calls
+  and zero continuation → record that the task completed autonomously under
+  an explicit budget in one of two attempts on this model and configuration
+  (L2-R1 failed, L2-R2 passed). This is not a rate and does not overwrite
+  L2-R1.
+- An empty response again → a second occurrence of the audited signature;
+  record it, run `audit_tool_protocol.py`, and stop. The classification
+  stays with the audit; no Keel mechanism (retry, reasoning extraction,
+  signature detection) follows from a second occurrence any more than from
+  the first. Whether to sample further is a separate decision.
+- Budget exhaustion or any other failure → freeze the evidence, classify the
+  dominant failure, stop; N is not raised afterwards.
+
+Report: `docs/evidence/L2R2_<date>.md`, a separate file; the L2 and L2-R1
+reports are not edited. Then stop for review.
+
 ## Interpretation rule
 
 A concrete failure → freeze the evidence, classify the dominant failure
