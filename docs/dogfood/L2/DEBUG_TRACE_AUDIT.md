@@ -1,7 +1,14 @@
 # Debug-trace audit: why the repair loop took so many calls (after L2-R2)
 
-Status: **protocol frozen 2026-09-10; static only, no model run, no Keel or
-PIRA change.** Decision (user, 2026-09-10): the L2-R2 classification is
+Status: **complete (2026-09-10, `docs/evidence/DEBUG_TRACE_2026-09-10.md`).**
+Loop 66–100 of L2-R2. Q1 yes (direct output, full assertion diff visible at
+call 66); Q2 premise not met, and 0 of 46 result IDs were ever retrieved;
+Q3 R3 F8 I1 H22 P0 O1. Rules 2 (model debugging behavior) and 3 (tool-use
+path) triggered, rule 1 not; no mechanism proposed. Lab delivery stored
+verbatim in `debug_trace_2026-09-10/`. Original status line follows.
+
+Protocol frozen 2026-09-10; static only, no model run, no Keel or
+PIRA change. Decision (user, 2026-09-10): the L2-R2 classification is
 accepted; no further sampling for now, the budget stays at 100, no
 empty-response retry is implemented. The next step is to read the logs that
 already exist and reconstruct one repair loop from its first relevant test

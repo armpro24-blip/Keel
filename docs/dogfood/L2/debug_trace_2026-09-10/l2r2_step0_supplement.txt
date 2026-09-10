@@ -1,0 +1,303 @@
+=== (a) l2r2_diff.patch from the queuewatch/events.py hunk onward
+diff --git a/queuewatch/events.py b/queuewatch/events.py
+index ff79009..a4d5345 100644
+--- a/queuewatch/events.py
++++ b/queuewatch/events.py
+@@ -13,7 +13,7 @@ from datetime import datetime
+ from .timeutil import TimeError, parse_timestamp
+ 
+ #: Event kinds the log may contain, in lifecycle order.
+-KINDS = ("created", "started", "completed", "failed")
++KINDS = ("created", "started", "completed", "failed", "retry")
+ 
+ 
+ class EventError(ValueError):
+diff --git a/queuewatch/report.py b/queuewatch/report.py
+index 95ed014..fce6c92 100644
+--- a/queuewatch/report.py
++++ b/queuewatch/report.py
+@@ -42,7 +42,9 @@ def render_table(rows):
+     return "\n".join(lines)
+ 
+ 
+-def render_report(jobs):
+-    """Rows for every job sorted by id, then the summary over all jobs."""
+-    ordered = sorted(jobs, key=lambda job: job.id)
++def render_report(jobs, status_filter=None):
++    """Rows for every job sorted by id (optionally filtered by status), 
++    then the summary over all jobs."""
++    filtered = [job for job in jobs if status_filter is None or job.status == status_filter]
++    ordered = sorted(filtered, key=lambda job: job.id)
+     return render_table(job_row(job) for job in ordered) + "\n" + render_summary(jobs)
+diff --git a/queuewatch/state.py b/queuewatch/state.py
+index a0ee86e..d13e063 100644
+--- a/queuewatch/state.py
++++ b/queuewatch/state.py
+@@ -59,6 +59,13 @@ def apply(job, event):
+         job.status = "failed"
+         job.finished_at = event.ts
+         job.reason = event.reason
++    elif event.kind == "retry":
++        if job.status != "failed":
++            _reject(event, job.status)
++        job.attempt += 1
++        job.status = "queued"
++        job.started_at = None
++        job.finished_at = None
+     else:
+         _reject(event, job.status)
+     job.history.append(event.kind)
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index dcaebde..6ea0895 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -79,13 +79,13 @@ class CliTests(unittest.TestCase):
+         )
+         code, out, err = self.run_main("check", path)
+         self.assertEqual((code, out), (1, ""))
+-        self.assertEqual(err, "queuewatch: line 2: job a: cannot apply 'completed' to a job that is queued\n")
++        self.assertEqual(err, "queuewatch: line 2: job a: cannot apply \'completed\' to a job that is queued\n")
+ 
+     def test_unknown_event_kind_is_a_data_error(self):
+         path = self.log('{"ts": "2026-09-01T08:00:00", "job": "a", "event": "paused"}\n')
+         code, out, err = self.run_main("report", path)
+         self.assertEqual((code, out), (1, ""))
+-        self.assertEqual(err, "queuewatch: line 1: unknown event 'paused'\n")
++        self.assertEqual(err, "queuewatch: line 1: unknown event \'paused\'\n")
+ 
+     def test_missing_subcommand_is_a_usage_error(self):
+         code, out, err = self.run_main()
+@@ -99,6 +99,40 @@ class CliTests(unittest.TestCase):
+         self.assertEqual((code, err), (0, ""))
+         self.assertTrue(out.endswith("total 7  queued 1  running 1  completed 3  failed 2\n"), out)
+ 
++    def test_report_status_filter_limits_rows(self):
++        code, out, err = self.run_main("report", self.path, "--status", "failed")
++        self.assertEqual((code, err), (0, ""))
++        self.assertEqual(
++            out.split("\n"),
++            [
++                "job  status  attempt  duration",
++                "a    failed    1        0:01:04",
++                "total 3  queued 1  running 0  completed 1  failed 1",
++                "",
++            ],
++        )
++
++    def test_report_no_match_status_filter(self):
++        code, out, err = self.run_main("report", self.path, "--status", "running")
++        self.assertEqual((code, err), (0, ""))
++        self.assertEqual(
++            out.split("\n"),
++            [
++                "job  status  attempt  duration",
++                "total 3  queued 1  running 0  completed 1  failed 1",
++                "",
++            ],
++        )
++
++    def test_report_unknown_status_is_rejected(self):
++        code, out, err = self.run_main("report", self.path, "--status", "bogus")
++        self.assertEqual((code, out), (2, ""))
++        self.assertIn("invalid choice", err)
++
++    def test_check_command_is_unaffected(self):
++        code, out, err = self.run_main("check", self.path)
++        self.assertEqual((code, out, err), (0, "ok: 7 events, 3 jobs\n", ""))
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/tests/test_report.py b/tests/test_report.py
+index a165d04..973252f 100644
+--- a/tests/test_report.py
++++ b/tests/test_report.py
+@@ -62,6 +62,50 @@ class TableTests(unittest.TestCase):
+             ],
+         )
+ 
++    def test_status_filter_limits_rows_but_summary_counts_all(self):
++        rows = [
++            job("a", "queued"),
++            job("b", "running", started=5),
++            job("c", "completed", started=0, finished=3),
++        ]
++        text = render_report(rows, status_filter="running")
++        self.assertEqual(
++            text.split("\n"),
++            [
++                "job  status   attempt  duration",
++                "b    running  1        -",
++                "total 3  queued 1  running 1  completed 1  failed 0",
++            ],
++        )
++
++    def test_no_jobs_match_status_filter(self):
++        text = render_report([job("a", "completed")], status_filter="queued")
++        self.assertEqual(
++            text.split("\n"),
++            [
++                "job  status  attempt  duration",
++                "total 1  queued 0  running 0  completed 1  failed 0",
++            ],
++        )
++
++    def test_status_filter_none_is_unchanged(self):
++        rows = [
++            job("a", "queued"),
++            job("b", "running", started=5),
++            job("c", "completed", started=0, finished=3),
++        ]
++        text = render_report(rows, status_filter=None)
++        self.assertEqual(
++            text.split("\n"),
++            [
++                "job  status     attempt  duration",
++                "a    queued     1        -",
++                "b    running    1        -",
++                "c    completed  1        0:00:03",
++                "total 3  queued 1  running 1  completed 1  failed 0",
++            ],
++        )
++
+     def test_empty_report_is_header_and_zero_summary(self):
+         self.assertEqual(
+             render_report([]).split("\n"),
+diff --git a/tests/test_state.py b/tests/test_state.py
+index 2f41bc1..c2d58e4 100644
+--- a/tests/test_state.py
++++ b/tests/test_state.py
+@@ -46,6 +46,33 @@ class LifecycleTests(unittest.TestCase):
+         job = replay(ev(1, "a", "created"), ev(2, "a", "started", 1), ev(3, "a", "completed", 2))["a"]
+         self.assertEqual(job.history, ["created", "started", "completed"])
+ 
++    def test_retry_on_a_failed_job_increments_attempt_and_returns_to_queued(self):
++        job = replay(
++            ev(1, "a", "created"),
++            ev(2, "a", "started", 5),
++            ev(3, "a", "failed", 9, reason="oom"),
++            ev(4, "a", "retry"),
++        )["a"]
++        self.assertEqual((job.id, job.status, job.attempt), ("a", "queued", 2))
++        self.assertIsNone(job.started_at)
++        self.assertIsNone(job.finished_at)
++        self.assertEqual(job.history, ["created", "started", "failed", "retry"])
++
++    def test_retry_allows_a_second_lifecycle_for_the_job(self):
++        job = replay(
++            ev(1, "a", "created"),
++            ev(2, "a", "started", 5),
++            ev(3, "a", "failed", 9, reason="oom"),
++            ev(4, "a", "retry"),
++            ev(5, "a", "started", 10, worker="w2"),
++            ev(6, "a", "completed", 20),
++        )["a"]
++        self.assertEqual(job.status, "completed")
++        self.assertEqual(job.attempt, 2)
++        self.assertEqual(job.started_at, T0.replace(second=10))
++        self.assertEqual(job.finished_at, T0.replace(second=20))
++        self.assertTrue(job.is_terminal())
++
+ 
+ class InvalidTransitionTests(unittest.TestCase):
+     def assert_rejected(self, events, message):
+
+=== (b) pira_ctx history --scope workspace --limit 100 (run in ~/Desktop/queuewatch-l2r2; 100 rows, newest first)
+history_hits=93 scanned=93 shown=93 complete=1 skipped=0 omitted_scopes=0 scope=current-workspace offset=0 lookback=all since_ms=none until_ms=none order=newest-first
+age | thread | exit | result | intent
+3h | 7ed1aad8fa14 | 1 | - | Run helper script to get expected output strings
+3h | 7ed1aad8fa14 | 0 | - | Write small marker file
+3h | 7ed1aad8fa14 | 0 | - | Empty the check file
+3h | 7ed1aad8fa14 | 1 | - | Run inline Python to check render_report output
+3h | 7ed1aad8fa14 | 1 | 20260910-140112-148cddf395e7 | Try running check script as queuewatch module
+3h | 7ed1aad8fa14 | 1 | - | Run check script from workspace root
+3h | 7ed1aad8fa14 | 0 | 20260910-140106-99facb7ffe24 | Check exact bytes of _check.py
+3h | 7ed1aad8fa14 | 1 | 20260910-140057-bbcbb5678fcf | Create check2.py
+3h | 7ed1aad8fa14 | 1 | 20260910-140053-bd54a978a1e1 | Check --status running (no match) on production data
+3h | 7ed1aad8fa14 | 1 | 20260910-140053-4cfad59052ad | Check --status failed output on production data
+3h | 7ed1aad8fa14 | 2 | 20260910-140047-82c1322cb65f | Check --status bogus rejection
+3h | 7ed1aad8fa14 | 0 | 20260910-140047-dbc36ef649b1 | Check --status running output (no match)
+3h | 7ed1aad8fa14 | 0 | 20260910-140047-8295d0bf9fae | Check --status queued output
+3h | 7ed1aad8fa14 | 0 | 20260910-140047-4da582764281 | Check --status completed output
+3h | 7ed1aad8fa14 | 1 | - | Run helper from workspace root so import works
+3h | 7ed1aad8fa14 | 1 | - | Run helper to check render_report output values
+3h | 7ed1aad8fa14 | 0 | - | Create helper script to check render_report output
+3h | 7ed1aad8fa14 | 1 | - | Get exact render_report output for test assertions using modulo for second
+3h | 7ed1aad8fa14 | 1 | - | Get exact render_report output strings for test assertions
+3h | 7ed1aad8fa14 | 0 | - | Load test helpers and produce expected outputs
+3h | 7ed1aad8fa14 | 1 | - | Check exact render_report output with status filter for test assertions
+3h | 7ed1aad8fa14 | 0 | 20260910-140001-9d805a5b243e | Run report with --status failed on events.jsonl
+3h | 7ed1aad8fa14 | 0 | 20260910-140001-614a4c36517b | Check data directory contents
+3h | 7ed1aad8fa14 | 1 | - | Check actual CLI output with --status failed
+3h | 7ed1aad8fa14 | 1 | - | Check actual --status failed output from CLI
+3h | 7ed1aad8fa14 | 0 | - | Check current report.py render_report signature
+3h | 7ed1aad8fa14 | 0 | - | Check current cli.py flow
+3h | 7ed1aad8fa14 | 0 | - | Check actual CLI test output expectations
+3h | 7ed1aad8fa14 | 0 | - | Check actual output for test assertions
+4h | 7ed1aad8fa14 | 1 | 20260910-135905-514ca5dae94d | Test what --status bogus produces
+4h | 7ed1aad8fa14 | 1 | - | Run full test suite including new tests
+4h | 7ed1aad8fa14 | 0 | - | Verify all modified test files compile
+4h | 7ed1aad8fa14 | 0 | - | Verify test_cli.py is valid Python syntax
+4h | 7ed1aad8fa14 | 0 | - | Write complete test_cli.py via PowerShell here-string
+4h | 7ed1aad8fa14 | 0 | 20260910-135819-84a0e3665b51 | Read restored test_cli.py
+4h | 7ed1aad8fa14 | 0 | - | Restore original test_cli.py from git
+4h | 7ed1aad8fa14 | 0 | 20260910-135810-29b3a5e2b12d | Test basic python -c on this platform
+4h | 7ed1aad8fa14 | 0 | - | Create helper generator script
+4h | 7ed1aad8fa14 | 0 | - | Create a helper script to generate test_cli.py
+4h | 7ed1aad8fa14 | 1 | 20260910-135745-fca21cf35e5e | Check temp directory for a saved version
+4h | 7ed1aad8fa14 | 1 | 20260910-135742-ba3259da35be | Write header of test_cli.py
+4h | 7ed1aad8fa14 | 1 | 20260910-135733-447ced44c9ee | Verify test_cli.py is valid Python
+4h | 7ed1aad8fa14 | 0 | - | Reconstruct test_cli.py with original tests plus new --status tests
+4h | 7ed1aad8fa14 | 0 | 20260910-135709-92e14666c970 | Check current file state
+4h | 7ed1aad8fa14 | 0 | - | Check current test_cli.py encoding state
+4h | 7ed1aad8fa14 | 0 | 20260910-135703-d6e0fc42be55 | Verify test_cli.py content after write
+4h | 7ed1aad8fa14 | 0 | - | Write updated test_cli.py with new --status tests inserted before test_check_command_is_unaffected
+4h | 7ed1aad8fa14 | 0 | 20260910-135652-2ff0a10c1621 | Inspect exact bytes around the target area for insertion
+4h | 7ed1aad8fa14 | 0 | 20260910-135643-44eb1528c457 | Check exact hex bytes at end of file
+4h | 7ed1aad8fa14 | 0 | 20260910-135639-2a4d608df94d | Find exact bytes around the if __name__ block
+4h | 7ed1aad8fa14 | 0 | 20260910-135628-c7245abec5dd | Get exact ending bytes of test_cli.py
+4h | 7ed1aad8fa14 | 0 | - | Read test_cli.py bytes directly via Python
+4h | 7ed1aad8fa14 | 1 | - | Read test_cli.py bytes directly
+4h | 7ed1aad8fa14 | 0 | - | Read full test_cli.py content via python
+4h | 7ed1aad8fa14 | 0 | 20260910-135610-d028c93ea81d | Read full test_cli.py content
+4h | 7ed1aad8fa14 | 0 | 20260910-135606-46fe4b480113 | Read test_cli.py content with proper line wrapping
+4h | 7ed1aad8fa14 | 0 | - | Read test_state.py to find where to add retry tests
+4h | 7ed1aad8fa14 | 0 | - | Run tests and show full output
+4h | 7ed1aad8fa14 | 0 | 20260910-135534-8bd937ce9365 | Read last 10 lines of test output
+4h | 7ed1aad8fa14 | 0 | 20260910-135532-0f1b537c6be0 | Read test output file
+4h | 7ed1aad8fa14 | 0 | - | Run tests and capture output
+4h | 7ed1aad8fa14 | 1 | 20260910-135431-1964f624e8fc | Count total output lines from test run
+4h | 7ed1aad8fa14 | 0 | 20260910-135428-33c85cbd02e0 | Read full test output
+4h | 7ed1aad8fa14 | 0 | - | Run test suite and capture to file
+4h | 7ed1aad8fa14 | 0 | 20260910-135424-1c5b132aab6d | Run test suite via captured mode to preserve all output
+4h | 7ed1aad8fa14 | 0 | 20260910-135422-a0f7fba54c0b | Run full test suite with visible output
+4h | 7ed1aad8fa14 | 0 | 20260910-135419-d5e66217b27d | Run all existing tests to ensure nothing breaks
+4h | 7ed1aad8fa14 | 0 | 20260910-135419-b5c1b698d5dd | Verify production log processes successfully with retry support
+4h | 7ed1aad8fa14 | 0 | - | Verify cli.py changes
+4h | 7ed1aad8fa14 | 0 | - | Verify report.py changes
+4h | 7ed1aad8fa14 | 0 | - | Verify state.py changes
+4h | 7ed1aad8fa14 | 0 | - | Verify events.py changes
+4h | 7ed1aad8fa14 | 0 | - | Read test_timeutil.py
+4h | 7ed1aad8fa14 | 0 | - | Read timeutil.py
+4h | 7ed1aad8fa14 | 0 | - | Read production data to see retry events
+4h | 7ed1aad8fa14 | 0 | 20260910-135334-b97db2ee2a53 | Read full test_cli.py via cmd
+4h | 7ed1aad8fa14 | 0 | 20260910-135331-f434af871283 | Read test_cli.py
+4h | 7ed1aad8fa14 | 0 | - | Read test_report.py
+4h | 7ed1aad8fa14 | 0 | - | Read test_state.py
+4h | 7ed1aad8fa14 | 0 | - | Read test_events.py
+4h | 7ed1aad8fa14 | 0 | - | Read cli.py via cmd
+4h | 7ed1aad8fa14 | 0 | 20260910-135324-f00efb5f2a6e | Read full cli.py content
+4h | 7ed1aad8fa14 | 0 | 20260910-135320-15dc734a6a38 | Read __main__.py module
+4h | 7ed1aad8fa14 | 0 | 20260910-135318-f78a60b2d987 | Read cli.py module
+4h | 7ed1aad8fa14 | 0 | 20260910-135317-451f08990635 | Read model.py module
+4h | 7ed1aad8fa14 | 0 | 20260910-135315-d377a5915533 | Read state.py module
+4h | 7ed1aad8fa14 | 0 | 20260910-135313-2438c3afc8e2 | Read events.py module
+4h | 7ed1aad8fa14 | 0 | 20260910-135311-337d034954d1 | Read report.py module
+4h | 7ed1aad8fa14 | 0 | 20260910-135304-7bbe8ec91317 | List test files
+4h | 7ed1aad8fa14 | 0 | 20260910-135302-132d2fe3bfdd | List queuewatch package contents
+4h | 7ed1aad8fa14 | 0 | 20260910-135255-7c96d28dbefd | List workspace root contents via PowerShell
+4h | 7ed1aad8fa14 | 2 | - | List workspace root contents
+4h | 7ed1aad8fa14 | 1 | 20260910-135253-73f09dfc2fe7 | Reproduce the failure on retry events
+
+=== (c) wc -l ~/Desktop/l2r2_logshow.txt
+2819 /c/Users/LM/Desktop/l2r2_logshow.txt

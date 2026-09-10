@@ -7,7 +7,10 @@ flags, and the first lines of the observation the model saw.
 
 Flags per tool call (all mechanical; the reading is the reviewer's):
 
-    repeat xK    the same tool with byte-identical input was already issued K times
+    repeat xK    the same command was already issued K times: for shell the
+                 same argv and mode (the intent prose is ignored), for
+                 edit_file the same path, old_text and new_text (the review
+                 text is ignored), for other tools the same input
     retrieve     a direct `pira_ctx` retrieval (search, range, transform, exec, raw,
                  list, history, recap, watch); the result IDs it names are listed
     helper       argv or edit path mentions one of the --helpers files
@@ -17,11 +20,15 @@ The summary counts calls, errors, repeats, retrievals, helper-related calls,
 and lists every result ID the model was given together with whether any later
 call retrieved from it. Nothing here scores or classifies; the protocol's
 categories are applied by hand on top of this table.
+
+Output is written as UTF-8 regardless of the console code page, so a
+redirected run on Windows does not fail on characters such as `→`.
 """
 
 import argparse
 import json
 import re
+import sys
 
 RESULT_ID = re.compile(r"\b\d{8}-\d{6}-[0-9a-f]{12}\b")
 RETRIEVAL = {"search", "range", "transform", "exec", "raw", "list", "history", "recap", "watch"}
@@ -39,7 +46,13 @@ def program_name(argv):
     return name[:-4] if name.lower().endswith(".exe") else name
 
 
-def input_key(tool, value):
+def command_key(tool, value):
+    """What counts as 'the same command' for the repeat flag."""
+    if isinstance(value, dict):
+        if tool == "shell":
+            value = {"argv": value.get("argv"), "mode": value.get("mode")}
+        elif tool == "edit_file":
+            value = {k: value.get(k) for k in ("path", "old_text", "new_text")}
     return tool + "\x00" + json.dumps(value, sort_keys=True, ensure_ascii=False)
 
 
@@ -64,7 +77,7 @@ def clip(text, width):
 
 
 def calls_of(events):
-    """Yield (call_index, tool_calls, results, decisions) per assistant message."""
+    """Yield (call_index, text, tool_calls, results, decisions) per assistant message."""
     decisions = {e["call_id"]: e for e in events if e.get("event") == "decision"}
     results = {}
     for e in events:
@@ -91,6 +104,9 @@ def main():
     parser.add_argument("--width", type=int, default=150)
     args = parser.parse_args()
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     helpers = [h.strip().replace("\\", "/").rsplit("/", 1)[-1] for h in args.helpers.split(",") if h.strip()]
     events = load(args.log)
     seen = {}
@@ -111,7 +127,7 @@ def main():
         for call in tool_calls:
             totals["tool_calls"] += 1
             tool, value = call["name"], call["input"]
-            key = input_key(tool, value)
+            key = command_key(tool, value)
             repeats = seen.get(key, 0)
             seen[key] = repeats + 1
             decision = decisions.get(call["id"], {}).get("decision")

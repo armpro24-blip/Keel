@@ -1,0 +1,899 @@
+call   1
+  shell            allow ERR python -m queuewatch report data/production_2026-09.jsonl  [id:20260910-135253-73f09dfc2fe7]
+    | Captured: 20260910-135253-73f09dfc2fe7 (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: queuewatch: line 5: unknown event 'retry' 
+    | [exit 1]
+  shell            allow ERR dir /B
+    | [stderr]
+    | dir: cannot access '/B': No such file or directory
+    | [exit 2]
+
+call   2
+  shell            allow ok  powershell -Command Get-ChildItem -Name  [id:20260910-135255-7c96d28dbefd]
+    | Captured: 20260910-135255-7c96d28dbefd (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: data 
+    | L2 stdout: queuewatch 
+    | L3 stdout: tests 
+
+call   3
+  read_pira_policy allow ok  {"name": "coding"}
+    | # CODING_STYLE
+    | 
+    | ## Requests
+    | - **Implement X:** deliver the smallest complete implementation. Complete means the user's goal is fully satisfied and verified with sufficient, non-…
+    | - **Optimize X:** start from existing code; use behavior-preserving refactors for readability and in-scope extensibility; improve reliability, securi…
+    | 
+  read_pira_policy allow ok  {"name": "research"}
+    | # RESEARCH_POLICY
+    | 
+    | ## Research Method
+    | - Identify the evidence-bearing claims, decisions, or uncertainties, their scope, and stated success, coverage, or quality criteria. Restate them onl…
+    | - Seek evidence that could support, weaken, or distinguish plausible conclusions. Apply only relevant sourcing, verification, comparison, and conflic…
+    | - Use the smallest sufficient evidence set. Deepen for unresolved consequential claims or requested breadth. Stop when the conclusion is supported, r…
+
+call   4
+  shell            allow ok  powershell -Command Get-ChildItem -Name queuewatch  [id:20260910-135302-132d2fe3bfdd]
+    | Captured: 20260910-135302-132d2fe3bfdd (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: __pycache__ 
+    | L2 stdout: cli.py 
+    | L3 stdout: events.py 
+  shell            allow ok  powershell -Command Get-ChildItem -Name tests  [id:20260910-135304-7bbe8ec91317]
+    | Captured: 20260910-135304-7bbe8ec91317 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: __pycache__ 
+    | L2 stdout: test_cli.py 
+    | L3 stdout: test_events.py 
+
+call   5  text: Let me read the core implementation files to understand the current structure.
+  read_pira_policy allow ok  {"name": "writing"}
+    | # SCIENTIFIC_WRITING
+    | 
+    | ## Requests
+    | - **Polish or proofread existing text**
+    |   - **Done when:** the text is clearer and more concise while preserving technical meaning, author voice, relative emphasis, uncertainty, notation, c…
+    |   - **Workflow:** infer purpose and audience from available context → highest-value issues → smallest sufficient edits → audit grammatical agreement …
+
+call   6
+  shell            allow ok  powershell -Command Get-Content queuewatch\report.py  [id:20260910-135311-337d034954d1]
+    | Captured: 20260910-135311-337d034954d1 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: """Rendering jobs as a report: one row per job, then a summary line.""" 
+    | L2 stdout:  
+    | L3 stdout: from .model import STATUSES 
+  shell            allow ok  powershell -Command Get-Content queuewatch\events.py  [id:20260910-135313-2438c3afc8e2]
+    | Captured: 20260910-135313-2438c3afc8e2 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: """Reading job events from a JSON Lines log. 
+    | L2 stdout:  
+    | L3 stdout: One JSON object per line with the fields ``ts`` (timestamp), ``job`` 
+  shell            allow ok  powershell -Command Get-Content queuewatch\state.py  [id:20260910-135315-d377a5915533]
+    | Captured: 20260910-135315-d377a5915533 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: """The job state machine: apply events to jobs. 
+    | L2 stdout:  
+    | L3 stdout: ```text 
+  shell            allow ok  powershell -Command Get-Content queuewatch\model.py  [id:20260910-135317-451f08990635]
+    | Captured: 20260910-135317-451f08990635 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: """The job record the state machine maintains.""" 
+    | L2 stdout:  
+    | L3 stdout: from dataclasses import dataclass, field 
+  shell            allow ok  powershell -Command Get-Content queuewatch\cli.py  [id:20260910-135318-f78a60b2d987]
+    | Result: 20260910-135318-f78a60b2d987 | exit=0 | 1438 B/46 lines | unselected=1048 B/39 lines
+    | Streams: stdout=1438 B/46 lines [non-UTF-8]; stderr=0 B/0 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: """Command line: ``queuewatch report FILE`` and ``queuewatch check FILE``.""" 
+    | L6 stdout: from .events import EventError, read_events 
+  shell            allow ok  powershell -Command Get-Content queuewatch\__main__.py  [id:20260910-135320-15dc734a6a38]
+    | Captured: 20260910-135320-15dc734a6a38 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: import sys 
+    | L2 stdout:  
+    | L3 stdout: from .cli import main 
+
+call   7
+  shell            allow ok  powershell -Command Get-Content queuewatch\cli.py -Raw  [id:20260910-135324-f00efb5f2a6e]
+    | Result: 20260910-135324-f00efb5f2a6e | exit=0 | 1394 B/47 lines | unselected=1021 B/40 lines
+    | Streams: stdout=1394 B/47 lines [non-UTF-8]; stderr=0 B/0 lines
+    | PROGRAM data:
+    | L1 stdout: """Command line: ``queuewatch report FILE`` and ``queuewatch check FILE``."""
+    | L6 stdout: from .events import EventError, read_events
+    | L28 stdout:     """Events ��' jobs, or a data error the caller reports."""
+
+call   8
+  shell            allow ok  cmd /C type queuewatch\cli.py
+    | """Command line: ``queuewatch report FILE`` and ``queuewatch check FILE``."""
+    | 
+    | import argparse
+    | import sys
+    | 
+    | from .events import EventError, read_events
+
+call   9  text: Now let me read the tests and the production data:
+  shell            allow ok  cmd /C type tests\test_events.py
+    | import os
+    | import tempfile
+    | import unittest
+    | from datetime import datetime
+    | 
+    | from queuewatch.events import KINDS, Event, EventError, parse_line, read_events
+  shell            allow ok  cmd /C type tests\test_state.py
+    | import unittest
+    | from datetime import datetime
+    | 
+    | from queuewatch.events import Event
+    | from queuewatch.state import TransitionError, apply, build_jobs
+    | 
+  shell            allow ok  cmd /C type tests\test_report.py
+    | import unittest
+    | from datetime import datetime
+    | 
+    | from queuewatch.model import Job
+    | from queuewatch.report import job_row, render_report, render_summary, render_table, summary_counts
+    | 
+  shell            allow ok  cmd /C type tests\test_cli.py  [id:20260910-135331-f434af871283]
+    | Result: 20260910-135331-f434af871283 | exit=0 | 4204 B/104 lines | unselected=3750 B/97 lines
+    | PROGRAM data:
+    | L14 stdout:     '{"ts": "2026-09-01T08:01:02", "job": "b", "event": "completed"}\n'
+    | L15 stdout:     '{"ts": "2026-09-01T08:01:09", "job": "a", "event": "failed", "reason": "oom"}\n'
+    | L16 stdout:     '{"ts": "2026-09-01T08:02:00", "job": "c", "event": "created"}\n'
+    | L20 stdout: class CliTests(unittest.TestCase):
+
+call  10
+  shell            allow ok  cmd /C type tests\test_cli.py  [id:20260910-135334-b97db2ee2a53]
+    | Result: 20260910-135334-b97db2ee2a53 | exit=0 | 4204 B/104 lines | unselected=3750 B/97 lines
+    | PROGRAM data:
+    | L14 stdout:     '{"ts": "2026-09-01T08:01:02", "job": "b", "event": "completed"}\n'
+    | L15 stdout:     '{"ts": "2026-09-01T08:01:09", "job": "a", "event": "failed", "reason": "oom"}\n'
+    | L16 stdout:     '{"ts": "2026-09-01T08:02:00", "job": "c", "event": "created"}\n'
+    | L20 stdout: class CliTests(unittest.TestCase):
+  shell            allow ok  cmd /C type data\production_2026-09.jsonl
+    | {"ts": "2026-09-03T06:00:00", "job": "ingest", "event": "created"}
+    | {"ts": "2026-09-03T06:00:02", "job": "ingest", "event": "started", "worker": "n1"}
+    | {"ts": "2026-09-03T06:00:30", "job": "transform", "event": "created"}
+    | {"ts": "2026-09-03T06:01:12", "job": "ingest", "event": "failed", "reason": "connection reset"}
+    | {"ts": "2026-09-03T06:01:20", "job": "ingest", "event": "retry"}
+    | {"ts": "2026-09-03T06:01:22", "job": "ingest", "event": "started", "worker": "n2"}
+
+call  11  text: Now let me also read the remaining test files and timeutil:
+  shell            allow ok  cmd /C type queuewatch\timeutil.py
+    | """Timestamps and durations.
+    | 
+    | Event timestamps are naive ISO-8601 (``YYYY-MM-DDTHH:MM:SS``); the log is
+    | assumed to come from one clock. Durations are rendered as ``H:MM:SS`` so the
+    | report is stable across platforms and locales.
+    | """
+  shell            allow ok  cmd /C type tests\test_timeutil.py
+    | import unittest
+    | from datetime import datetime, timedelta
+    | 
+    | from queuewatch.timeutil import TimeError, duration_between, format_duration, parse_timestamp
+    | 
+    | 
+
+call  12  text: I have a complete picture of the codebase. Let me implement all the changes.\n\n**Plan:**\n1. Add `"retry"` to `KINDS` in `events…
+  edit_file        deny  ERR events.py: 53B -> 62B  old[0]='KINDS = ("created", "started", "completed", "failed")'
+    deny: PIRA Full-Permission Behavior: an edit needs a non-empty safety_review before it runs without host approval; resend with the review
+    | not executed: PIRA Full-Permission Behavior: an edit needs a non-empty safety_review before it runs without host approval; resend with the review
+
+call  13
+  edit_file        allow ok  events.py: 53B -> 62B  old[0]='KINDS = ("created", "started", "completed", "failed")'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\events.py: 53 bytes (1 lines) -> 62 bytes (1 lines); file 2350 -> 2359 bytes
+
+call  14  text: Now let me handle the retry logic in `state.py`. A retry is valid only when the job is `failed` — it increments attempt count and…
+  edit_file        allow ok  state.py: 216B -> 438B  old[0]='    elif event.kind == "failed":'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\state.py: 216 bytes (7 lines) -> 438 bytes (14 lines); file 2159 -> 2381 bytes
+
+call  15  text: Now let me add the `--status` filter to the report command in `cli.py`:
+  edit_file        allow ok  cli.py: 231B -> 259B  old[0]='"""Command line: ``queuewatch report FILE`` and ``queuewatch check FILE``."""'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\cli.py: 231 bytes (8 lines) -> 259 bytes (9 lines); file 1392 -> 1420 bytes
+
+call  16  text: Now add the `--status` argument and apply the filter:
+  edit_file        allow ok  cli.py: 147B -> 315B  old[0]='    report = commands.add_parser("report", help="one row per job plus a summary line")'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\cli.py: 147 bytes (2 lines) -> 315 bytes (7 lines); file 1420 -> 1588 bytes
+
+call  17  text: Now apply the filter in the report command's output section:
+  edit_file        allow ok  cli.py: 228B -> 387B  old[0]='    if args.command == "check":'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\cli.py: 228 bytes (7 lines) -> 387 bytes (12 lines); file 1588 -> 1747 bytes
+
+call  18  text: Wait — I need to re-read the requirement: "The summary line must still count all jobs." The `render_report` function currently us…
+  edit_file        allow ok  report.py: 237B -> 391B  old[0]='def render_report(jobs):'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\report.py: 237 bytes (4 lines) -> 391 bytes (6 lines); file 1589 -> 1743 bytes
+
+call  19  text: Let me verify the current state of the edited files:
+  shell            allow ok  cmd /C type queuewatch\events.py
+    | """Reading job events from a JSON Lines log.
+    | 
+    | One JSON object per line with the fields ``ts`` (timestamp), ``job``
+    | (identifier) and ``event`` (kind); ``worker`` and ``reason`` are optional.
+    | A line that cannot become an event raises ``EventError`` naming the line,
+    | so a corrupt export fails loudly rather than producing a wrong report.
+  shell            allow ok  cmd /C type queuewatch\state.py
+    | """The job state machine: apply events to jobs.
+    | 
+    | ```text
+    | (absent) --created--> queued --started--> running --completed--> completed
+    |                                              \\--failed-----> failed
+    | ```
+  shell            allow ok  cmd /C type queuewatch\report.py
+    | """Rendering jobs as a report: one row per job, then a summary line."""
+    | 
+    | from .model import STATUSES
+    | from .timeutil import duration_between, format_duration
+    | 
+    | COLUMNS = ("job", "status", "attempt", "duration")
+  shell            allow ok  cmd /C type queuewatch\cli.py
+    | """Command line: ``queuewatch report FILE`` and ``queuewatch check FILE``."""
+    | 
+    | import argparse
+    | import sys
+    | 
+    | from .events import EventError, read_events
+
+call  20  text: Let me verify the production log now works, then run the existing tests:
+  shell            allow ok  python -m queuewatch report data/production_2026-09.jsonl  [id:20260910-135419-b5c1b698d5dd]
+    | Captured: 20260910-135419-b5c1b698d5dd (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: job        status     attempt  duration 
+    | L2 stdout: cleanup    queued     1        - 
+    | L3 stdout: ingest     completed  2        0:02:23 
+  shell            allow ok  python -m unittest discover -s tests -v  [id:20260910-135419-d5e66217b27d]
+    | Result: 20260910-135419-d5e66217b27d | exit=0 | 4891 B/47 lines | unselected=4255 B/39 lines
+    | Streams: stdout=0 B/0 lines; stderr=4891 B/47 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L3 stderr: test_malformed_line_is_a_data_error_with_its_number (test_cli.CliTests.test_malformed_line_is_a_data_error_with_its_number) ... ok 
+    | L4 stderr: test_missing_file_is_a_data_error (test_cli.CliTests.test_missing_file_is_a_data_error) ... ok 
+
+call  21  text: The output was truncated. Let me see the full test run:
+  shell            allow ok  python -m unittest discover -s tests -v  [id:20260910-135422-a0f7fba54c0b]
+    | Result: 20260910-135422-a0f7fba54c0b | exit=0 | 4891 B/47 lines | unselected=4255 B/39 lines
+    | Streams: stdout=0 B/0 lines; stderr=4891 B/47 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L3 stderr: test_malformed_line_is_a_data_error_with_its_number (test_cli.CliTests.test_malformed_line_is_a_data_error_with_its_number) ... ok 
+    | L4 stderr: test_missing_file_is_a_data_error (test_cli.CliTests.test_missing_file_is_a_data_error) ... ok 
+
+call  22
+  shell            allow ok  [capture] python -m unittest discover -s tests -v  [id:20260910-135424-1c5b132aab6d]
+    | Result: 20260910-135424-1c5b132aab6d | exit=0 | 4891 B/47 lines | unselected=4255 B/39 lines
+    | Streams: stdout=0 B/0 lines; stderr=4891 B/47 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L3 stderr: test_malformed_line_is_a_data_error_with_its_number (test_cli.CliTests.test_malformed_line_is_a_data_error_with_its_number) ... ok 
+    | L4 stderr: test_missing_file_is_a_data_error (test_cli.CliTests.test_missing_file_is_a_data_error) ... ok 
+
+call  23
+  shell            allow ok  cmd /C python -m unittest discover -s tests -v > tests_output.txt 2>&1  [helper]
+    | [exit 0]
+
+call  24
+  shell            allow ok  cmd /C type tests_output.txt  [helper id:20260910-135428-33c85cbd02e0]
+    | Result: 20260910-135428-33c85cbd02e0 | exit=0 | 4891 B/47 lines | unselected=4317 B/40 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L4 stdout: test_missing_file_is_a_data_error (test_cli.CliTests.test_missing_file_is_a_data_error) ... ok 
+    | L5 stdout: test_missing_subcommand_is_a_usage_error (test_cli.CliTests.test_missing_subcommand_is_a_usage_error) ... ok 
+    | L8 stdout: test_unknown_event_kind_is_a_data_error (test_cli.CliTests.test_unknown_event_kind_is_a_data_error) ... ok 
+
+call  25  text: The display is truncating. Let me check specific test counts:
+  shell            allow ERR cmd /C python -m unittest discover -s tests -v 2>&1 | find /c /v ""  [id:20260910-135431-1964f624e8fc]
+    | Result: 20260910-135431-1964f624e8fc | exit=1 | 231000353 B/2042765 lines | unselected=230999301 B/2042755 lines
+    | Index: truncated; search covers only the indexed retained prefix; range unavailable
+    | Streams: stdout=230947847 B/2042420 lines; stderr=52506 B/345 lines
+    | PROGRAM data:
+    | L4 stderr: find: '/c/$Recycle.Bin/S-1-5-18': Permission denied
+    | L6 stderr: find: '/c/$Recycle.Bin/S-1-5-21-2689294361-3524023311-3293127072-1001': Permission denied
+
+call  26  text: The piped output is capturing the whole filesystem. Let me use a cleaner approach — run the test in the working directory and rea…
+  shell            allow ok  cmd /C python -m unittest discover -s tests -v > tests_output.txt 2>&1  [helper]
+    | [exit 0]
+
+call  27
+  read_pira_policy allow ok  {"name": "coding"}  [repeat x1]
+    | # CODING_STYLE
+    | 
+    | ## Requests
+    | - **Implement X:** deliver the smallest complete implementation. Complete means the user's goal is fully satisfied and verified with sufficient, non-…
+    | - **Optimize X:** start from existing code; use behavior-preserving refactors for readability and in-scope extensibility; improve reliability, securi…
+    | 
+
+call  28
+  shell            allow ok  cmd /C type tests_output.txt  [helper id:20260910-135532-0f1b537c6be0]
+    | Result: 20260910-135532-0f1b537c6be0 | exit=0 | 4891 B/47 lines | unselected=4329 B/40 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L4 stdout: test_missing_file_is_a_data_error (test_cli.CliTests.test_missing_file_is_a_data_error) ... ok 
+    | L5 stdout: test_missing_subcommand_is_a_usage_error (test_cli.CliTests.test_missing_subcommand_is_a_usage_error) ... ok 
+    | L7 stdout: test_sample_data_file_reports_seven_jobs (test_cli.CliTests.test_sample_data_file_reports_seven_jobs) ... ok 
+
+call  29  text: Let me read the end of the output file to see the test count:
+  shell            allow ok  cmd /C powershell -Command "Get-Content tests_output.txt -Tail 10"  [helper id:20260910-135534-8bd937ce9365]
+    | Captured: 20260910-135534-8bd937ce9365 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: Get-Content tests_output.txt -Tail 10 
+    | [exit 0]
+
+call  30  text: The output capture seems limited. Let me try a simpler approach:
+  shell            allow ok  [exact] cmd /C python -m unittest discover -s tests -v 2>&1
+    | test_check_counts_events_and_jobs (test_cli.CliTests.test_check_counts_events_and_jobs) ... ok
+    | test_invalid_transition_is_a_data_error_naming_line_and_job (test_cli.CliTests.test_invalid_transition_is_a_data_error_naming_line_and_job) ... ok
+    | test_malformed_line_is_a_data_error_with_its_number (test_cli.CliTests.test_malformed_line_is_a_data_error_with_its_number) ... ok
+    | test_missing_file_is_a_data_error (test_cli.CliTests.test_missing_file_is_a_data_error) ... ok
+    | test_missing_subcommand_is_a_usage_error (test_cli.CliTests.test_missing_subcommand_is_a_usage_error) ... ok
+    | test_report_prints_rows_and_summary (test_cli.CliTests.test_report_prints_rows_and_summary) ... ok
+
+call  31  text: All 42 tests pass. Now I'll add the new tests and update the README. Let me add tests in the existing test files:
+  shell            allow ok  cmd /C type tests\test_state.py
+    | import unittest
+    | from datetime import datetime
+    | 
+    | from queuewatch.events import Event
+    | from queuewatch.state import TransitionError, apply, build_jobs
+    | 
+
+call  32  text: Let me add the new tests to the existing test files:
+  edit_file        allow ok  test_state.py: 231B -> 1370B  old[0]='    def test_history_lists_every_applied_event(self):'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_state.py: 231 bytes (3 lines) -> 1370 bytes (30 lines); file 4060 -> 5199 byt…
+
+call  33  text: Now add the `--status` filter tests. Let me add them to `test_report.py` and `test_cli.py`:
+  edit_file        allow ok  test_report.py: 500B -> 1778B  old[0]='    def test_report_sorts_rows_by_job_id_and_ends_with_the_summary(self):'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_report.py: 500 bytes (11 lines) -> 1778 bytes (48 lines); file 2739 -> 4017 b…
+
+call  34
+  edit_file        allow ERR test_cli.py: 47B -> 342B  old[0]='    def test_check_command_is_unaffected(self):'
+    | old_text not found in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_cli.py
+
+call  35
+  shell            allow ok  cmd /C type tests\test_cli.py  [id:20260910-135606-46fe4b480113]
+    | Result: 20260910-135606-46fe4b480113 | exit=0 | 4204 B/104 lines | unselected=3703 B/97 lines
+    | PROGRAM data:
+    | L14 stdout:     '{"ts": "2026-09-01T08:01:02", "job": "b", "event": "completed"}\n'
+    | L15 stdout:     '{"ts": "2026-09-01T08:01:09", "job": "a", "event": "failed", "reason": "oom"}\n'
+    | L16 stdout:     '{"ts": "2026-09-01T08:02:00", "job": "c", "event": "created"}\n'
+    | L20 stdout: class CliTests(unittest.TestCase):
+
+call  36  text: Let me read the full file to find the correct insertion point:
+  read_pira_policy allow ok  {"name": "coding"}  [repeat x2]
+    | # CODING_STYLE
+    | 
+    | ## Requests
+    | - **Implement X:** deliver the smallest complete implementation. Complete means the user's goal is fully satisfied and verified with sufficient, non-…
+    | - **Optimize X:** start from existing code; use behavior-preserving refactors for readability and in-scope extensibility; improve reliability, securi…
+    | 
+
+call  37
+  shell            allow ok  cmd /C powershell -Command "[System.IO.File]::ReadAllText('tests\\test_cli.py')"  [id:20260910-135610-d028c93ea81d]
+    | Captured: 20260910-135610-d028c93ea81d (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: [System.IO.File]::ReadAllText('tests\\test_cli.py') 
+    | [exit 0]
+
+call  38
+  shell            allow ok  cmd /C python -c "print(open('tests\\test_cli.py').read())"
+    | [exit 0]
+
+call  39
+  shell            allow ERR [exact] cmd /C python -c "import sys; sys.stdout.buffer.write(open(r'tests\\test_cli.py','rb').read())"
+    | [stderr]
+    |   File "<string>", line 1
+    |     "import
+    |     ^
+    | SyntaxError: unterminated string literal (detected at line 1)
+    | [exit 1]
+
+call  40
+  shell            allow ok  [exact] python -c import sys; sys.stdout.buffer.write(open(r'tests\test_cli.py', 'rb').read())
+    | import contextlib
+    | import io
+    | import os
+    | import tempfile
+    | import unittest
+    | 
+
+call  41  text: Now I'll add CLI tests for the `--status` flag to test_cli.py. I'll add them before the `if __name__` block:
+  edit_file        allow ERR test_cli.py: 233B -> 1346B  old[0]='    def test_check_command_is_unaffected(self):'
+    | old_text not found in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_cli.py
+
+call  42  text: Let me check the exact bytes at the end of the file:
+  shell            allow ok  python -c data=open(r'tests\\test_cli.py','rb').read(); print(repr(data[-300:]))  [id:20260910-135628-c7245abec5dd]
+    | Captured: 20260910-135628-c7245abec5dd (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: b'.path.join(here, "..", "data", "events.jsonl")\n        code, out, err = self.run_main("report", sample)\n        self.assertEqual((code…
+    | [exit 0]
+
+call  43
+  edit_file        allow ERR test_cli.py: 233B -> 1346B  old[0]='    def test_check_command_is_unaffected(self):'  [repeat x1]
+    | old_text not found in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_cli.py
+
+call  44  text: Let me check the exact bytes more carefully:
+  shell            allow ok  python -c data=open(r'tests\\test_cli.py','rb').read(); i=data.rfind(b'if __name__'); print(repr(data[i-20:i+60]))  [id:20260910-135639-2a4d608df94d]
+    | Captured: 20260910-135639-2a4d608df94d (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: b'ailed 2\\n"), out)\n\n\nif __name__ == "__main__":\n    unittest.main()\n' 
+    | [exit 0]
+
+call  45
+  shell            allow ok  python -c data=open(r'tests\\test_cli.py','rb').read(); print(data[-40:].hex())  [id:20260910-135643-44eb1528c457]
+    | Captured: 20260910-135643-44eb1528c457 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: 6d655f5f203d3d20225f5f6d61696e5f5f223a0a20202020756e6974746573742e6d61696e28290a 
+    | [exit 0]
+
+call  46
+  edit_file        allow ERR test_cli.py: 233B -> 1346B  old[0]='    def test_check_command_is_unaffected(self):'  [repeat x2]
+    | old_text not found in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_cli.py
+
+call  47  text: The edit keeps failing because the exact bytes don't match. Let me inspect the exact bytes around the target area.
+  shell            allow ok  python -c data=open(r'tests\\test_cli.py','rb').read(); i=data.rfind(b'if __name__'); print(repr(data[i-200:i+60]))  [id:20260910-135652-2ff0a10c1621]
+    | Captured: 20260910-135652-2ff0a10c1621 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: b'  code, out, err = self.run_main("report", sample)\n        self.assertEqual((code, err), (0, ""))\n        self.assertTrue(out.endswith…
+    | [exit 0]
+
+call  48  text: The file has two blank lines between the last test and `if __name__`. My old_text has the same pattern but the edit keeps failing…
+  shell            allow ok  python -c data=open(r'tests\\test_cli.py','rb').read(); i=data.rfind(b'if __name__'); before=data[:i]; content=b'    def test_report_status_filter_li…
+    | [exit 0]
+
+call  49
+  shell            allow ok  python -c print(open(r'tests\\test_cli.py').read())  [id:20260910-135703-d6e0fc42be55]
+    | Result: 20260910-135703-d6e0fc42be55 | exit=0 | 5647 B/141 lines | unselected=5113 B/133 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout:     def test_report_status_filter_limits_rows(self): 
+    | L2 stdout:         code, out, err = self.run_main("report", self.path, "--status", "failed") 
+    | L3 stdout:         self.assertEqual((code, err), (0, "")) 
+
+call  50  text: The file got mangled. Let me rewrite it correctly from scratch using the known content:
+  shell            allow ok  python -c open(r'tests\\test_cli.py','w',encoding='utf-8').write(open(r'tests\\test_cli.py','rb').read().decode('utf-8','replace'))
+    | [exit 0]
+
+call  51  text: The file got corrupted by my direct write. Let me reconstruct it properly from the original content and the new additions:
+  shell            allow ok  python -c data=open(r'tests\\test_cli.py','rb').read(); print(repr(data[:200]))  [id:20260910-135709-92e14666c970]
+    | Captured: 20260910-135709-92e14666c970 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: b'' 
+    | [exit 0]
+
+call  52  text: The file got wiped. Let me recreate it from the original content plus the new tests.
+  shell            allow ok  python -c open(r'tests\\test_cli.py','w',encoding='utf-8').write('import contextlib\nimport io\nimport os\nimport tempfile\nimport unittest\n\nfrom q…
+    | [exit 0]
+
+call  53
+  shell            allow ERR python -m py_compile tests/test_cli.py  [id:20260910-135733-447ced44c9ee]
+    | Captured: 20260910-135733-447ced44c9ee (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr:   File "tests/test_cli.py", line 10 
+    | L2 stderr:     '"{"ts": "2026-09-01T08:00:00", "job": "b", "event": "created"} 
+    | L3 stderr:     ^ 
+
+call  54  text: The implicit string concatenation got mangled by shell escaping. Let me write the file using a Python script file to avoid escapi…
+  shell            allow ERR cmd /C python -c "import textwrap, os; f=open(r'tests\\test_cli.py','w',encoding='utf-8'); f.write(textwrap.dedent('''\n    import contextlib\n    im…  [id:20260910-135742-ba3259da35be]
+    | Captured: 20260910-135742-ba3259da35be (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr:   File "<string>", line 1 
+    | L2 stderr:     "import 
+    | L3 stderr:     ^ 
+
+call  55
+  shell            allow ERR python -c open(r'C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_cli.py','w',encoding='utf-8').write(open(r'C:\Users\LM\.local\tmptest\cli.py','r').re…  [id:20260910-135745-fca21cf35e5e]
+    | Captured: 20260910-135745-fca21cf35e5e (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: Traceback (most recent call last): 
+    | L2 stderr:   File "<string>", line 1, in <module> 
+    | L3 stderr: FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\LM\\.local\\tmptest\\cli.py' 
+
+call  56  text: Let me use a different approach — write a generator script to a temp file and run it:
+  shell            allow ok  python -c with open(r'C:\Users\LM\Desktop\queuewatch-l2r2\tests\_write_cli.py', 'w') as f: f.write('done')  [helper]
+    | [exit 0]
+
+call  57
+  shell            allow ok  python -c open(r'tests\_write_cli.py','w').write('import os\n\npath = r\"C:\\Users\\LM\\Desktop\\queuewatch-l2r2\\tests\\test_cli.py\"\n\nlines = []\…  [helper]
+    | [exit 0]
+
+call  58  text: Let me use a simpler approach — write the generator script with `echo` line by line via PowerShell.
+  shell            deny  ERR {"argv": "[\"powershell\", \"-Command\", \"[System.IO.File]::WriteAllLines('C:\\\\Users\\\\LM\\\\Desktop\\\\queuewatch-l2r2\\\\tests\\\\gen_cli.py', …
+    deny: input needs an array field 'argv'
+    | not executed: input needs an array field 'argv'
+
+call  59
+  shell            allow ok  python -c import json, sys; sys.stdout.buffer.write(b'\x00')  [id:20260910-135810-29b3a5e2b12d]
+    | Result: 20260910-135810-29b3a5e2b12d | exit=0 | 1 B/1 lines | unselected=0 B/0 lines
+    | Streams: stdout=1 B/1 lines [binary]; stderr=0 B/0 lines
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: 
+    | [exit 0]
+
+call  60  text: Let me take a step back. The original test_cli.py is still in git — I can restore it and then use `edit_file` which worked reliab…
+  shell            allow ok  git checkout tests/test_cli.py
+    | [stderr]
+    | Updated 1 path from the index
+    | [exit 0]
+
+call  61  text: Good, the original is restored. Now let me use `edit_file` properly — it worked on the other test files. The issue was I was copy…
+  shell            allow ok  cmd /C type tests\test_cli.py  [id:20260910-135819-84a0e3665b51]
+    | Result: 20260910-135819-84a0e3665b51 | exit=0 | 4204 B/104 lines | unselected=3750 B/97 lines
+    | PROGRAM data:
+    | L14 stdout:     '{"ts": "2026-09-01T08:01:02", "job": "b", "event": "completed"}\n'
+    | L15 stdout:     '{"ts": "2026-09-01T08:01:09", "job": "a", "event": "failed", "reason": "oom"}\n'
+    | L16 stdout:     '{"ts": "2026-09-01T08:02:00", "job": "c", "event": "created"}\n'
+    | L20 stdout: class CliTests(unittest.TestCase):
+
+call  62
+  read_pira_policy allow ok  {"name": "coding"}  [repeat x3]
+    | # CODING_STYLE
+    | 
+    | ## Requests
+    | - **Implement X:** deliver the smallest complete implementation. Complete means the user's goal is fully satisfied and verified with sufficient, non-…
+    | - **Optimize X:** start from existing code; use behavior-preserving refactors for readability and in-scope extensibility; improve reliability, securi…
+    | 
+
+call  63
+  shell            allow ok  powershell -Command $content = @'\nimport contextlib\nimport io\nimport os\nimport tempfile\nimport unittest\n\nfrom queuewatch.cli import main\n\nLO…
+    | [exit 0]
+
+call  64
+  shell            allow ok  python -m py_compile tests/test_cli.py
+    | [exit 0]
+
+call  65  text: Good, syntax is valid. Let me also verify test_report.py is still valid:
+  shell            allow ok  python -m py_compile tests/test_report.py tests/test_state.py
+    | [exit 0]
+
+call  66  text: Now run the full test suite:
+  shell            allow ERR [exact] python -m unittest discover -s tests -v
+    | [stderr]
+    | test_check_command_is_unaffected (test_cli.CliTests.test_check_command_is_unaffected) ... ok
+    | test_check_counts_events_and_jobs (test_cli.CliTests.test_check_counts_events_and_jobs) ... ok
+    | test_invalid_transition_is_a_data_error_naming_line_and_job (test_cli.CliTests.test_invalid_transition_is_a_data_error_naming_line_and_job) ... ok
+    | test_malformed_line_is_a_data_error_with_its_number (test_cli.CliTests.test_malformed_line_is_a_data_error_with_its_number) ... ok
+    | test_missing_file_is_a_data_error (test_cli.CliTests.test_missing_file_is_a_data_error) ... ok
+
+call  67  text: The issue is clear: the CLI filters the list before passing it to `render_report`, so the summary counts only the filtered jobs. …
+  edit_file        allow ok  cli.py: 387B -> 426B  old[0]='    if args.command == "check":'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\cli.py: 387 bytes (12 lines) -> 426 bytes (13 lines); file 1747 -> 1786 bytes
+
+call  68
+  shell            allow ERR python -c from queuewatch.cli import main; import io, contextlib; out=io.StringIO(); err=io.StringIO(); ctx=contextlib.redirect_stdout(out), contextl…  [id:20260910-135905-514ca5dae94d]
+    | Captured: 20260910-135905-514ca5dae94d (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: Traceback (most recent call last): 
+    | L2 stderr:   File "<string>", line 1, in <module> 
+    | L3 stderr:   File "<string>", line 1 
+
+call  69  text: Two issues:\n1. `--status bogus` isn't rejected by argparse — need `choices` on the argument.\n2. Column widths in report tests a…
+  edit_file        allow ok  cli.py: 167B -> 193B  old[0]='    report.add_argument('
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\queuewatch\cli.py: 167 bytes (5 lines) -> 193 bytes (6 lines); file 1786 -> 1812 bytes
+
+call  70  text: Now fix the test expectations. The column widths depend on what data is present:
+  shell            allow ok  [exact] python -c from queuewatch.report import render_report, job_row\nfrom queuewatch.model import Job\nfrom datetime import datetime\nT = datetime…
+    | 'job  status   attempt  duration\nb    running  1        -\ntotal 3  queued 1  running 1  completed 1  failed 0'
+    | ---
+    | 'job  status  attempt  duration\na    queued  1        -\ntotal 3  queued 1  running 1  completed 1  failed 0'
+    | ---
+    | 'job  status     attempt  duration\na    queued     1        -\nb    running    1        -\nc    completed  1        0:00:03\ntotal 3  queued 1  runn…
+    | ---
+
+call  71
+  edit_file        allow ok  test_report.py: 1276B -> 1525B  old[0]='    def test_status_filter_limits_rows_but_summary_counts_all(self):'
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\tests\test_report.py: 1276 bytes (36 lines) -> 1525 bytes (43 lines); file 4017 -> 4266 …
+
+call  72  text: Now fix the CLI tests. The `--status bogus` with `choices` should produce exit code 2. And the column widths in the filtered outp…
+  shell            allow ok  [exact] python -c from queuewatch.report import render_report\nfrom queuewatch.model import Job\nfrom datetime import datetime\nT = datetime(2026, 9,…
+    | --- failed filter ---
+    | 'job  status  attempt  duration\nd    failed  1        0:00:04\ntotal 4  queued 2  running 0  completed 1  failed 1'
+    | --- running filter (no match) ---
+    | 'job  status  attempt  duration\ntotal 4  queued 2  running 0  completed 1  failed 1'
+    | --- all jobs summary filter ---
+    | 'job  status     attempt  duration\na    queued     1        -\nb    completed  1        -\nc    queued     1        -\nd    failed     1        0:00…
+
+call  73  text: I need to understand the current flow better. The issue is: `cli.py` filters `jobs_list`, then passes it to `render_report(jobs_l…
+  shell            allow ok  cmd /C type queuewatch\cli.py
+    | """Command line: ``queuewatch report FILE`` and ``queuewatch check FILE``."""
+    | 
+    | import argparse
+    | import sys
+    | 
+    | from .events import EventError, read_events
+  shell            allow ok  cmd /C type queuewatch\report.py
+    | """Rendering jobs as a report: one row per job, then a summary line."""
+    | 
+    | from .model import STATUSES
+    | from .timeutil import duration_between, format_duration
+    | 
+    | COLUMNS = ("job", "status", "attempt", "duration")
+
+call  74  text: The `cli.py` is already correct (passes all jobs to `render_report`). The tests just need correct column widths. Let me verify:
+  shell            allow ERR [exact] python -c from queuewatch.cli import main; import io, contextlib; out=io.StringIO(); err=io.StringIO(); ctx= contextlib.redirect_stdout(out),…
+    | [stderr]
+    |   File "<string>", line 1
+    |     from queuewatch.cli import main; import io, contextlib; out=io.StringIO(); err=io.StringIO(); ctx= contextlib.redirect_stdout(out), contextlib.re…
+    |                                                                                                                                                      …
+    | SyntaxError: invalid syntax
+    | [exit 1]
+
+call  75
+  shell            allow ERR [exact] python -m queuewatch report data/sample.jsonl --status failed
+    | [stderr]
+    | queuewatch: [Errno 2] No such file or directory: 'data/sample.jsonl'
+    | [exit 1]
+
+call  76
+  shell            allow ok  cmd /C dir data\  [id:20260910-140001-614a4c36517b]
+    | Captured: 20260910-140001-614a4c36517b (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout:  Volume in Laufwerk C: hat keine Bezeichnung. 
+    | L2 stdout:  Volumeseriennummer: 4AF2-E6CA 
+    | L3 stdout:  
+  shell            allow ok  python -m queuewatch report data/events.jsonl --status failed  [id:20260910-140001-9d805a5b243e]
+    | Captured: 20260910-140001-9d805a5b243e (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: job        status  attempt  duration 
+    | L2 stdout: build-web  failed  1        0:03:35 
+    | L3 stdout: test-e2e   failed  1        0:03:38 
+
+call  77
+  shell            allow ERR [exact] python -c from queuewatch.report import render_report; from queuewatch.model import Job; from datetime import datetime; T = datetime(2026, 9,…
+    | [stderr]
+    |   File "<string>", line 1
+    |     from queuewatch.report import render_report; from queuewatch.model import Job; from datetime import datetime; T = datetime(2026, 9, 1, 8, 0, 0); …
+    |                                                                                                                                                      …
+    | SyntaxError: invalid syntax
+    | [exit 1]
+
+call  78  text: Let me write a small helper to get the exact output strings:
+  shell            allow ok  python -c exec(open('tests/test_report.py').read().split('class RowTests')[0])
+    | [exit 0]
+
+call  79
+  shell            allow ERR [exact] python -c exec(open('tests/test_report.py').read().split('\nif __name__')[0]); from queuewatch.report import render_report; print('=== failed…
+    | === failed filter ===
+    | [stderr]
+    | Traceback (most recent call last):
+    |   File "<string>", line 1, in <module>
+    |   File "<string>", line 16, in job
+    | ValueError: second must be in 0..59
+
+call  80  text: Right, `started=64` isn't valid for a second. Let me use a different approach — create a small script file:
+  shell            allow ERR [exact] python -c from queuewatch.model import Job; from queuewatch.report import render_report; from datetime import datetime; T=datetime(2026,9,1,8…
+    | [stderr]
+    |   File "<string>", line 1
+    |     from queuewatch.model import Job; from queuewatch.report import render_report; from datetime import datetime; T=datetime(2026,9,1,8,0,0); def job…
+    |                                                                                                                                               ^^^
+    | SyntaxError: invalid syntax
+    | [exit 1]
+
+call  81  text: Let me use a helper script:
+  shell            allow ok  python -c s=open('C:\\Users\\LM\\Desktop\\queuewatch-l2r2\\tests\\_check.py','w').write('from queuewatch.model import Job\nfrom queuewatch.report imp…  [helper]
+    | [exit 0]
+
+call  82
+  shell            allow ERR [exact] python C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py  [helper]
+    | [stderr]
+    | Traceback (most recent call last):
+    |   File "C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py", line 1, in <module>
+    |     from queuewatch.model import Job
+    | ModuleNotFoundError: No module named 'queuewatch'
+    | [exit 1]
+
+call  83
+  shell            allow ERR [exact] python tests\_check.py  [helper]
+    | [stderr]
+    | Traceback (most recent call last):
+    |   File "C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py", line 1, in <module>
+    |     from queuewatch.model import Job
+    | ModuleNotFoundError: No module named 'queuewatch'
+    | [exit 1]
+
+call  84
+  edit_file        deny  ERR _check.py: 902B -> 85B  old[0]='from queuewatch.model import Job'  [helper]
+    deny: PIRA Full-Permission Behavior: an edit needs a non-empty safety_review before it runs without host approval; resend with the review
+    | not executed: PIRA Full-Permission Behavior: an edit needs a non-empty safety_review before it runs without host approval; resend with the review
+
+call  85
+  shell            allow ok  python -m queuewatch report data/production_2026-09.jsonl --status completed  [id:20260910-140047-4da582764281]
+    | Captured: 20260910-140047-4da582764281 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: job        status     attempt  duration 
+    | L2 stdout: ingest     completed  2        0:02:23 
+    | L3 stdout: transform  completed  3        0:02:24 
+  shell            allow ok  python -m queuewatch report data/production_2026-09.jsonl --status queued  [id:20260910-140047-8295d0bf9fae]
+    | Captured: 20260910-140047-8295d0bf9fae (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: job      status  attempt  duration 
+    | L2 stdout: cleanup  queued  1        - 
+    | L3 stdout: publish  queued  2        - 
+  shell            allow ok  python -m queuewatch report data/production_2026-09.jsonl --status running  [id:20260910-140047-dbc36ef649b1]
+    | Captured: 20260910-140047-dbc36ef649b1 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: job  status  attempt  duration 
+    | L2 stdout: total 4  queued 2  running 0  completed 2  failed 0 
+    | [exit 0]
+  shell            allow ERR python -m queuewatch report data/production_2026-09.jsonl --status bogus  [id:20260910-140047-82c1322cb65f]
+    | Captured: 20260910-140047-82c1322cb65f (exit 2):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: usage: queuewatch report [-h] [--status {queued,running,completed,failed}] 
+    | L2 stderr:                          path 
+    | L3 stderr: queuewatch report: error: argument --status: invalid choice: 'bogus' (choose from queued, running, completed, failed) 
+
+call  86  text: Let me get the exact CLI output for the test data:
+  shell            allow ERR python -m queuewatch report tests/../../data/sample.jsonl --status failed  [id:20260910-140053-4cfad59052ad]
+    | Captured: 20260910-140053-4cfad59052ad (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: queuewatch: [Errno 2] No such file or directory: 'tests/../../data/sample.jsonl' 
+    | [exit 1]
+  shell            allow ERR python -m queuewatch report tests/../../data/sample.jsonl --status running  [id:20260910-140053-bd54a978a1e1]
+    | Captured: 20260910-140053-bd54a978a1e1 (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: queuewatch: [Errno 2] No such file or directory: 'tests/../../data/sample.jsonl' 
+    | [exit 1]
+
+call  87  text: The CLI tests use a temp file with specific LOG data. Let me create a small script to check the exact output:
+  shell            allow ERR python -c exec(open(r'C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check2.py', 'w').write(open(r'C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check2.py',…  [helper id:20260910-140057-bbcbb5678fcf]
+    | Captured: 20260910-140057-bbcbb5678fcf (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: Traceback (most recent call last): 
+    | L2 stderr:   File "<string>", line 1, in <module> 
+    | L3 stderr: io.UnsupportedOperation: not readable 
+
+call  88
+  edit_file        allow ERR _check.py: 85B -> 1266B  old[0]='#!/usr/bin/env python3'  [helper]
+    | old_text not found in C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py (the file uses CRLF line endings and old_text does not)
+
+call  89
+  shell            allow ok  python -c data=open(r'C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py','rb').read(); print(repr(data))  [helper id:20260910-140106-99facb7ffe24]
+    | Captured: 20260910-140106-99facb7ffe24 (exit 0):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stdout: b'from queuewatch.model import Job\r\nfrom queuewatch.report import render_report\r\nfrom datetime import datetime\r\n\r\nT=datetime(2026,…
+    | [exit 0]
+
+call  90  text: Let me just run the existing check script to get outputs:
+  shell            allow ERR [exact] python tests\_check.py  [helper]
+    | [stderr]
+    | Traceback (most recent call last):
+    |   File "C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py", line 1, in <module>
+    |     from queuewatch.model import Job
+    | ModuleNotFoundError: No module named 'queuewatch'
+    | [exit 1]
+
+call  91
+  shell            allow ERR python -m queuewatch report tests\_check.py  [helper id:20260910-140112-148cddf395e7]
+    | Captured: 20260910-140112-148cddf395e7 (exit 1):
+    | Warning: display-control characters in PROGRAM output were sanitized.
+    | PROGRAM data:
+    | L1 stderr: queuewatch: line 1: not valid JSON (Expecting value) 
+    | [exit 1]
+
+call  92
+  shell            allow ERR [exact] cmd /C python -c "import sys; sys.path.insert(0, '.'); from queuewatch.model import Job; from queuewatch.report import render_report; from da…
+    | [stderr]
+    |   File "<string>", line 1
+    |     "import
+    |     ^
+    | SyntaxError: unterminated string literal (detected at line 1)
+    | [exit 1]
+
+call  93  text: Let me create a proper Python script and run it:
+  edit_file        allow ERR _check.py: 902B -> 1296B  old[0]='from queuewatch.model import Job'  [helper]
+    | old_text not found in C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py (the file uses CRLF line endings and old_text does not)
+
+call  94
+  shell            allow ok  python -c open(r'C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py', 'w', encoding='utf-8').write('')  [helper]
+    | [exit 0]
+
+call  95  text: Let me create a quick helper script and run it:
+  edit_file        deny  ERR _check.py: 0B -> 1319B  old[0]=''  [helper]
+    deny: 'old_text' must not be empty
+    | not executed: 'old_text' must not be empty
+
+call  96
+  shell            allow ok  python -c p = r'C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py'; open(p, 'w', encoding='utf-8').write('# check\n')  [helper]
+    | [exit 0]
+
+call  97
+  edit_file        allow ok  _check.py: 7B -> 1319B  old[0]='# check'  [helper]
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py: 7 bytes (1 lines) -> 1319 bytes (42 lines); file 9 -> 1321 bytes
+
+call  98
+  shell            allow ERR [exact] python tests\_check.py  [helper]
+    | [stderr]
+    | Traceback (most recent call last):
+    |   File "C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py", line 26, in <module>
+    |     job("a", "failed", started=1, finished=64),
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py", line 20, in job
+
+call  99
+  edit_file        allow ok  _check.py: 1319B -> 1319B  old[0]='#!/usr/bin/env python3'  [helper]
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py: 1319 bytes (42 lines) -> 1319 bytes (42 lines); file 1321 -> 1321 bytes
+
+call 100  text: Both are the same. The issue is `started=0, finished=64` — 64 seconds isn't valid for `replace(second=64)`.
+  edit_file        allow ok  _check.py: 196B -> 196B  old[0]='# 1. Sample log data (3 jobs: a=failed, b=completed, c=queued)'  [helper]
+    | replaced 1 occurrence in C:\Users\LM\Desktop\queuewatch-l2r2\tests\_check.py: 196 bytes (6 lines) -> 196 bytes (6 lines); file 1321 -> 1321 bytes
+
+summary
+  model calls 100  tool calls 123  error results 34  empty responses 0
+  repeated identical calls 5  pira_ctx retrievals 0  helper-related calls 24
+  pira_ctx result IDs given to the model: 46; retrieved from later: 0
+    20260910-135253-73f09dfc2fe7  given at call 1  retrieved at never
+    20260910-135255-7c96d28dbefd  given at call 2  retrieved at never
+    20260910-135302-132d2fe3bfdd  given at call 4  retrieved at never
+    20260910-135304-7bbe8ec91317  given at call 4  retrieved at never
+    20260910-135311-337d034954d1  given at call 6  retrieved at never
+    20260910-135313-2438c3afc8e2  given at call 6  retrieved at never
+    20260910-135315-d377a5915533  given at call 6  retrieved at never
+    20260910-135317-451f08990635  given at call 6  retrieved at never
+    20260910-135318-f78a60b2d987  given at call 6  retrieved at never
+    20260910-135320-15dc734a6a38  given at call 6  retrieved at never
+    20260910-135324-f00efb5f2a6e  given at call 7  retrieved at never
+    20260910-135331-f434af871283  given at call 9  retrieved at never
+    20260910-135334-b97db2ee2a53  given at call 10  retrieved at never
+    20260910-135419-b5c1b698d5dd  given at call 20  retrieved at never
+    20260910-135419-d5e66217b27d  given at call 20  retrieved at never
+    20260910-135422-a0f7fba54c0b  given at call 21  retrieved at never
+    20260910-135424-1c5b132aab6d  given at call 22  retrieved at never
+    20260910-135428-33c85cbd02e0  given at call 24  retrieved at never
+    20260910-135431-1964f624e8fc  given at call 25  retrieved at never
+    20260910-135532-0f1b537c6be0  given at call 28  retrieved at never
+    20260910-135534-8bd937ce9365  given at call 29  retrieved at never
+    20260910-135606-46fe4b480113  given at call 35  retrieved at never
+    20260910-135610-d028c93ea81d  given at call 37  retrieved at never
+    20260910-135628-c7245abec5dd  given at call 42  retrieved at never
+    20260910-135639-2a4d608df94d  given at call 44  retrieved at never
+    20260910-135643-44eb1528c457  given at call 45  retrieved at never
+    20260910-135652-2ff0a10c1621  given at call 47  retrieved at never
+    20260910-135703-d6e0fc42be55  given at call 49  retrieved at never
+    20260910-135709-92e14666c970  given at call 51  retrieved at never
+    20260910-135733-447ced44c9ee  given at call 53  retrieved at never
+    20260910-135742-ba3259da35be  given at call 54  retrieved at never
+    20260910-135745-fca21cf35e5e  given at call 55  retrieved at never
+    20260910-135810-29b3a5e2b12d  given at call 59  retrieved at never
+    20260910-135819-84a0e3665b51  given at call 61  retrieved at never
+    20260910-135905-514ca5dae94d  given at call 68  retrieved at never
+    20260910-140001-614a4c36517b  given at call 76  retrieved at never
+    20260910-140001-9d805a5b243e  given at call 76  retrieved at never
+    20260910-140047-4da582764281  given at call 85  retrieved at never
+    20260910-140047-8295d0bf9fae  given at call 85  retrieved at never
+    20260910-140047-dbc36ef649b1  given at call 85  retrieved at never
+    20260910-140047-82c1322cb65f  given at call 85  retrieved at never
+    20260910-140053-4cfad59052ad  given at call 86  retrieved at never
+    20260910-140053-bd54a978a1e1  given at call 86  retrieved at never
+    20260910-140057-bbcbb5678fcf  given at call 87  retrieved at never
+    20260910-140106-99facb7ffe24  given at call 89  retrieved at never
+    20260910-140112-148cddf395e7  given at call 91  retrieved at never
